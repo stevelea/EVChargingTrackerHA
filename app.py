@@ -30,15 +30,9 @@ if 'gmail_client' not in st.session_state:
 
 # Function to get the base URL for the app
 def get_base_url():
-    # Get the base URL for the Streamlit app
-    replit_domain = os.environ.get("REPL_SLUG")
-    replit_owner = os.environ.get("REPL_OWNER")
-    
-    if replit_domain and replit_owner:
-        return f"https://{replit_domain}.{replit_owner}.repl.co"
-    
-    # Fallback for development environments
-    return "http://localhost:5000"
+    # Simplified function to return a hardcoded URL that's easy for the user to add to Google Cloud Console
+    # This makes it easier to add to Google Cloud Console
+    return "https://workspace-stevelea1.replit.app"
 
 # App title and description
 st.title("⚡ EV Charging Data Analyzer")
@@ -77,16 +71,15 @@ with st.sidebar:
     if not st.session_state.authenticated:
         st.info("Please authenticate with your Gmail account to access your charging receipts.")
         
-        # Get app base URL for suggested redirect URI
+        # Get app base URL for OAuth - now this is hardcoded
         app_base_url = get_base_url()
-        st.info("Use this exact URI in your Google Cloud Console OAuth settings:")
-        redirect_uri = st.text_input(
-            "Authorized redirect URI",
-            value=app_base_url, 
-            help="Copy this URL to your Google Cloud Console's OAuth Credentials as an authorized redirect URI"
-        )
+        st.info("IMPORTANT: Add this exact URL to your Google Cloud Console OAuth settings:")
+        st.code(app_base_url, language=None)
         
-        st.info(f"Make sure to add '{app_base_url}' to your Google Cloud Console authorized redirect URIs")
+        # Use a hidden field to ensure the redirect URI is exactly what we need
+        redirect_uri = app_base_url
+        
+        st.warning("Please make sure you've added this exact URL to your Google Cloud Console as an authorized redirect URI before continuing.")
         
         # Authentication button
         if st.button("Sign in with Google"):
