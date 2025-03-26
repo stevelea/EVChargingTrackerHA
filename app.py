@@ -48,6 +48,9 @@ if "code" in query_params and "state" in query_params:
         redirect_uri_param = redirect_uri_params[0] if redirect_uri_params else "http://localhost:5000"
         redirect_uri = f"{base_url}/" if base_url else redirect_uri_param
         
+        # Display the redirect URI being used (for troubleshooting)
+        st.info(f"Using redirect URI: {redirect_uri}")
+        
         # Process OAuth response
         if st.session_state.gmail_client.authorize_with_params(query_params, redirect_uri):
             st.session_state.authenticated = True
@@ -73,6 +76,9 @@ with st.sidebar:
         redirect_uri_params = st.query_params.get_all("redirect_uri")
         redirect_uri_param = redirect_uri_params[0] if redirect_uri_params else "http://localhost:5000"
         redirect_uri = f"{base_url}/" if base_url else redirect_uri_param
+        
+        # Display redirect URI (for troubleshooting)
+        st.info(f"Redirect URI: {redirect_uri} - Please add this URL to your Google Cloud Console authorized redirect URIs.")
         
         # Authentication button
         if st.button("Sign in with Google"):
