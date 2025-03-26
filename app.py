@@ -805,6 +805,22 @@ if st.session_state.authenticated:
         # Generate all charts
         charts = create_visualizations(data)
         
+        # Add predictive analysis charts for grid layout
+        # Monthly cost forecast
+        _, forecast_fig = forecast_monthly_cost(data)
+        if forecast_fig:
+            charts['monthly_cost_forecast'] = forecast_fig
+            
+        # Provider cost trends
+        provider_trends_fig = predict_cost_by_provider(data)
+        if provider_trends_fig:
+            charts['provider_trend_prediction'] = provider_trends_fig
+            
+        # Usage prediction (default 30 days)
+        _, usage_fig = usage_prediction(data)
+        if usage_fig:
+            charts['usage_prediction'] = usage_fig
+        
         # Function to render a visualization panel
         def render_visualization(viz_id, charts):
             if viz_id in charts and st.session_state.dashboard_preferences['panels'][viz_id]['visible']:
@@ -896,6 +912,63 @@ if st.session_state.authenticated:
                                     if 'provider_kwh_comparison' in charts:
                                         st.subheader(st.session_state.dashboard_preferences['panels']['provider_kwh_comparison']['name'])
                                         st.plotly_chart(charts['provider_kwh_comparison'], use_container_width=True)
+                    
+                    elif group['name'] == 'Future Predictions':
+                        st.subheader("Predictive Analysis for Future Costs")
+                        st.write("Based on your historical charging data, here are predictions for future costs and usage patterns.")
+                        
+                        # Monthly cost forecast
+                        if st.session_state.dashboard_preferences['panels'].get('monthly_cost_forecast', {}).get('visible', False):
+                            st.markdown("### Monthly Cost Forecast")
+                            st.write("Forecast of your monthly charging costs for the next 3 months.")
+                            
+                            with st.spinner("Generating monthly cost forecast..."):
+                                # Generate the forecast
+                                forecast_df, forecast_fig = forecast_monthly_cost(data)
+                                
+                                if forecast_fig:
+                                    st.plotly_chart(forecast_fig, use_container_width=True)
+                                    
+                                    if forecast_df is not None:
+                                        with st.expander("View forecast data"):
+                                            st.dataframe(forecast_df)
+                                else:
+                                    st.info("Not enough data for monthly cost forecasting. Continue collecting data for at least 5 charging sessions.")
+                        
+                        # Provider cost trends prediction
+                        if st.session_state.dashboard_preferences['panels'].get('provider_trend_prediction', {}).get('visible', False):
+                            st.markdown("### Provider Cost Trends")
+                            st.write("Predicted cost per kWh trends by provider over time.")
+                            
+                            with st.spinner("Analyzing provider cost trends..."):
+                                # Generate provider cost trends
+                                provider_trends_fig = predict_cost_by_provider(data)
+                                
+                                if provider_trends_fig:
+                                    st.plotly_chart(provider_trends_fig, use_container_width=True)
+                                else:
+                                    st.info("Not enough data to predict provider cost trends. Try collecting more data from various providers.")
+                        
+                        # Usage prediction
+                        if st.session_state.dashboard_preferences['panels'].get('usage_prediction', {}).get('visible', False):
+                            st.markdown("### Charging Usage Prediction")
+                            st.write("Prediction of your daily charging usage for the next 30 days.")
+                            
+                            # Add options for prediction
+                            prediction_days = st.slider("Days to predict", 7, 90, 30)
+                            
+                            with st.spinner("Generating usage prediction..."):
+                                # Generate usage prediction
+                                usage_df, usage_fig = usage_prediction(data, future_days=prediction_days)
+                                
+                                if usage_fig:
+                                    st.plotly_chart(usage_fig, use_container_width=True)
+                                    
+                                    if usage_df is not None:
+                                        with st.expander("View predicted usage data"):
+                                            st.dataframe(usage_df)
+                                else:
+                                    st.info("Not enough data for usage prediction. Continue collecting data for at least 10 charging sessions.")
                     
                     elif group['name'] == 'Raw Data':
                         st.subheader("Raw Data")
