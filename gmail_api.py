@@ -66,6 +66,8 @@ class GmailClient:
     def get_emails(self, query="", max_results=100):
         """
         Retrieve emails matching search criteria using IMAP
+        
+        This method now supports multiple search terms separated by "OR"
         """
         if not self.imap:
             raise ValueError("Not authenticated. Please authenticate first.")
@@ -74,28 +76,47 @@ class GmailClient:
             # Select the mailbox
             self.imap.select('INBOX')
             
-            # Prepare search criteria with proper escaping
-            query = query.replace('"', '\\"')  # Escape double quotes
+            # Split the query by "OR" to handle multiple search terms
+            search_terms = query.split(" OR ")
+            all_email_ids = set()
             
-            # Try searching by subject first
-            search_criteria = f'SUBJECT "{query}"' if query else 'ALL'
-            
-            # Search for messages
-            status, message_ids = self.imap.search(None, search_criteria)
-            
-            # If no results, try a broader search in the body
-            if status == 'OK' and not message_ids[0]:
-                search_criteria = f'TEXT "{query}"'
+            # For each search term, perform separate searches
+            for term in search_terms:
+                term = term.strip()
+                if not term:
+                    continue
+                    
+                # Escape any quotes in the search term
+                term = term.replace('"', '\\"')
+                
+                # Try searching by subject first
+                search_criteria = f'SUBJECT "{term}"' if term else 'ALL'
+                
+                # Search for messages
                 status, message_ids = self.imap.search(None, search_criteria)
+                
+                # If status is OK and we have results, add them to our set
+                if status == 'OK' and message_ids[0]:
+                    message_id_list = message_ids[0].split()
+                    all_email_ids.update(message_id_list)
+                
+                # Try searching by text/body next
+                search_criteria = f'TEXT "{term}"'
+                status, message_ids = self.imap.search(None, search_criteria)
+                
+                # If status is OK and we have results, add them to our set
+                if status == 'OK' and message_ids[0]:
+                    message_id_list = message_ids[0].split()
+                    all_email_ids.update(message_id_list)
             
-            if status != 'OK':
-                raise ValueError(f"Error searching for emails: {status}")
+            # Convert set back to list and limit results
+            message_id_list = list(all_email_ids)[:max_results]
             
-            # Convert space-separated string of message IDs to a list
-            message_id_list = message_ids[0].split()
-            
-            # Limit the number of messages to retrieve
-            message_id_list = message_id_list[:max_results]
+            # If we have no results, try a generic search for "charging"
+            if not message_id_list and not query:
+                status, message_ids = self.imap.search(None, 'SUBJECT "charging"')
+                if status == 'OK' and message_ids[0]:
+                    message_id_list = message_ids[0].split()[:max_results]
             
             emails = []
             for msg_id in message_id_list:
@@ -118,6 +139,19 @@ class GmailClient:
             return emails
         
         except Exception as e:
+            # Make sure to properly close the connection on error
+            try:
+                self.imap.close()
+            except:
+                pass
+            
+            # Create a new IMAP connection for future use
+            try:
+                self.imap = imaplib.IMAP4_SSL("imap.gmail.com")
+                self.imap.login(self.email_address, self.app_password)
+            except:
+                self.imap = None
+                
             st.error(f"Error fetching emails: {str(e)}")
             return []
     
@@ -181,10 +215,29 @@ class GmailClient:
             return None
     
     def close(self):
-        """Close the IMAP connection"""
+        """Close the IMAP connection and reset it for future use"""
         if self.imap:
             try:
-                self.imap.close()
-                self.imap.logout()
+                # Try to properly close and logout
+                try:
+                    self.imap.close()
+                except:
+                    pass
+                    
+                try:
+                    self.imap.logout()
+                except:
+                    pass
+                
+                # Create a new connection for future use if we have credentials
+                if self.email_address and self.app_password:
+                    try:
+                        self.imap = imaplib.IMAP4_SSL("imap.gmail.com")
+                        self.imap.login(self.email_address, self.app_password)
+                    except:
+                        self.imap = None
+                else:
+                    self.imap = None
             except:
-                pass  # Ignore errors on close
+                # Last resort - set to None if all else fails
+                self.imap = None

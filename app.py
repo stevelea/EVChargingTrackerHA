@@ -121,9 +121,9 @@ with st.sidebar:
         
         # Search query options
         st.write("Search options:")
-        default_search = "EV charging receipt OR Your Ampol AmpCharge tax invoice OR Your charging session receipt"
+        default_search = "EV charging receipt OR Ampol AmpCharge OR charging session"
         search_label = st.text_input("Email search term", default_search)
-        st.caption("You can use 'OR' to search for multiple terms. The default includes common EV charging receipt formats.")
+        st.caption("You can use 'OR' to search for multiple terms. The app will search both subject and body content for each term.")
         
         # Fetch data button
         if st.button("Fetch Charging Data"):
@@ -167,11 +167,35 @@ with st.sidebar:
                     else:
                         st.warning("No emails found matching your search criteria.")
                     
-                    # Close the IMAP connection when done
-                    gmail_client.close()
+                    # Make sure to properly close the IMAP connection when done
+                    try:
+                        gmail_client.close()
+                    except:
+                        pass
                         
                 except Exception as e:
-                    st.error(f"Error fetching data: {str(e)}")
+                    # On error, still try to close the connection
+                    try:
+                        gmail_client.close()
+                    except:
+                        pass
+                        
+                    # Show error message
+                    error_message = str(e)
+                    if "LOGOUT" in error_message:
+                        st.error("Connection error with Gmail. Please try again or log out and log back in.")
+                        # Attempt to reconnect
+                        try:
+                            st.session_state.gmail_client = GmailClient()
+                            if st.session_state.gmail_client.authenticate(
+                                email_address=gmail_client.email_address, 
+                                app_password=gmail_client.app_password
+                            ):
+                                st.info("Connection restored. Please try searching again.")
+                        except:
+                            st.error("Could not automatically restore the connection. Please log out and log back in.")
+                    else:
+                        st.error(f"Error fetching data: {error_message}")
         
         # Display last refresh time
         if st.session_state.last_refresh:
