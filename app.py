@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import os
-import json
 from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
+import urllib.parse
 
 from gmail_api import GmailClient
 from data_parser import parse_charging_emails
@@ -25,12 +25,35 @@ if 'last_refresh' not in st.session_state:
     st.session_state.last_refresh = None
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
-if 'credentials' not in st.session_state:
-    st.session_state.credentials = None
+if 'gmail_client' not in st.session_state:
+    st.session_state.gmail_client = GmailClient()
+
+# Function to get the base URL for the app
+def get_base_url():
+    # Get the base URL for the Streamlit app
+    return st.experimental_get_query_params().get("base_url", [""])[0]
 
 # App title and description
 st.title("⚡ EV Charging Data Analyzer")
 st.write("Extract and visualize your EV charging data from Gmail receipts")
+
+# Process OAuth callback
+query_params = st.experimental_get_query_params()
+if "code" in query_params and "state" in query_params:
+    try:
+        # Get the callback URL for authentication
+        base_url = get_base_url() or st.experimental_get_query_params().get("redirect_uri", [""])[0]
+        redirect_uri = f"{base_url}/" if base_url else st.experimental_get_query_params().get("redirect_uri", ["http://localhost:5000"])[0]
+        
+        # Process OAuth response
+        if st.session_state.gmail_client.authorize_with_params(query_params, redirect_uri):
+            st.session_state.authenticated = True
+            st.success("Authentication successful!")
+            # Clear the URL parameters
+            st.experimental_set_query_params()
+    except Exception as e:
+        st.error(f"Authentication error: {str(e)}")
+        st.session_state.authenticated = False
 
 # Sidebar for controls
 with st.sidebar:
@@ -42,37 +65,23 @@ with st.sidebar:
     if not st.session_state.authenticated:
         st.info("Please authenticate with your Gmail account to access your charging receipts.")
         
-        # File uploader for credentials.json
-        uploaded_file = st.file_uploader("Upload your credentials.json file", type="json")
+        # Get the current URL for the redirect_uri
+        base_url = get_base_url() or st.experimental_get_query_params().get("redirect_uri", ["http://localhost:5000"])[0]
+        redirect_uri = f"{base_url}/" if base_url else "http://localhost:5000"
         
-        if uploaded_file is not None:
-            # Save credentials temporarily
-            credentials_data = json.load(uploaded_file)
-            st.session_state.credentials = credentials_data
-            
-            # Initialize Gmail client
-            gmail_client = GmailClient(credentials_data)
-            
-            # Authentication button
-            if st.button("Authenticate"):
-                try:
-                    auth_url = gmail_client.get_authorization_url()
-                    st.markdown(f"[Click here to authorize]({auth_url})")
-                    auth_code = st.text_input("Enter the authorization code:")
-                    
-                    if auth_code:
-                        gmail_client.authorize_with_code(auth_code)
-                        st.session_state.authenticated = True
-                        st.session_state.gmail_client = gmail_client
-                        st.success("Authentication successful!")
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Authentication error: {str(e)}")
+        # Authentication button
+        if st.button("Sign in with Google"):
+            try:
+                auth_url = st.session_state.gmail_client.get_authorization_url(redirect_uri)
+                st.markdown(f"[Click here to authorize with Google]({auth_url})")
+                st.info("After authorization, you'll be redirected back to this app automatically.")
+            except Exception as e:
+                st.error(f"Authentication error: {str(e)}")
     else:
         st.success("Authenticated with Gmail")
         if st.button("Logout"):
             st.session_state.authenticated = False
-            st.session_state.credentials = None
+            st.session_state.gmail_client = GmailClient()  # Reset the client
             st.session_state.charging_data = None
             st.rerun()
     

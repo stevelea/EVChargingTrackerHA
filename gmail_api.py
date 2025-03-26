@@ -1,7 +1,7 @@
 import os
 import base64
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import email
@@ -9,46 +9,65 @@ from email.utils import parsedate_to_datetime
 import streamlit as st
 import tempfile
 import json
+import secrets
+import urllib.parse
 
 class GmailClient:
     """Class to handle Gmail API authentication and email retrieval"""
     
-    def __init__(self, credentials_data=None):
+    # Google OAuth client ID for web application
+    CLIENT_CONFIG = {
+        "web": {
+            "client_id": "974252666486-2nk6p0ctqtj4u07s4ugt4a5vuvcc9rnf.apps.googleusercontent.com",
+            "client_secret": "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",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token"
+        }
+    }
+    
+    def __init__(self):
         self.SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
-        self.credentials_data = credentials_data
         self.creds = None
         self.service = None
         self.flow = None
+        self.state = secrets.token_urlsafe(16)  # Generate a random state token
     
-    def get_authorization_url(self):
+    def get_authorization_url(self, redirect_uri):
         """Get the authorization URL for the user to authenticate with Google"""
-        # Create a temporary file to store credentials
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
-            json.dump(self.credentials_data, f)
-            temp_creds_file = f.name
-        
-        # Create the flow using the credentials file
-        self.flow = InstalledAppFlow.from_client_secrets_file(
-            temp_creds_file,
+        # Create flow instance using client config
+        self.flow = Flow.from_client_config(
+            self.CLIENT_CONFIG,
             scopes=self.SCOPES,
-            redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # For console-based auth
+            redirect_uri=redirect_uri
         )
         
         # Generate the auth URL
         auth_url, _ = self.flow.authorization_url(
             access_type='offline',
-            include_granted_scopes='true'
+            include_granted_scopes='true',
+            state=self.state,
+            prompt='consent'
         )
-        
-        # Clean up the temporary file
-        os.unlink(temp_creds_file)
         
         return auth_url
     
-    def authorize_with_code(self, code):
-        """Exchange the authorization code for credentials"""
-        if not self.flow:
-            raise ValueError("Authorization flow not initialized. Call get_authorization_url first.")
+    def authorize_with_params(self, params, redirect_uri):
+        """Process the authorization response and exchange code for credentials"""
+        # Verify state to prevent CSRF attacks
+        if params.get('state') != self.state:
+            raise ValueError("State mismatch. Possible CSRF attack.")
+        
+        # Get authorization code from URL parameters
+        code = params.get('code')
+        if not code:
+            raise ValueError("No authorization code received")
+        
+        # Reset flow with the same redirect_uri as used in authorization
+        self.flow = Flow.from_client_config(
+            self.CLIENT_CONFIG,
+            scopes=self.SCOPES,
+            redirect_uri=redirect_uri
+        )
         
         # Exchange the code for credentials
         self.flow.fetch_token(code=code)
