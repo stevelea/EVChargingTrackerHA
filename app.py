@@ -9,7 +9,12 @@ import urllib.parse
 from gmail_api import GmailClient
 from tesla_api import TeslaApiClient
 from data_parser import parse_charging_emails, parse_evcc_csv, clean_charging_data
+from pdf_parser import parse_multiple_pdfs
 from data_visualizer import create_visualizations
+from data_storage import (
+    load_charging_data, save_charging_data, merge_charging_data, 
+    convert_to_dataframe, filter_data_by_date_range, delete_charging_data
+)
 from utils import get_date_range, export_data_as_csv, save_credentials, load_credentials
 
 # Set page configuration
@@ -22,9 +27,26 @@ st.set_page_config(
 
 # Initialize session state for data storage
 if 'charging_data' not in st.session_state:
-    st.session_state.charging_data = None
+    # Try to load data from persistent storage
+    existing_data = load_charging_data()
+    if existing_data:
+        # Process the existing data
+        try:
+            df = clean_charging_data(existing_data)
+            st.session_state.charging_data = df
+        except Exception as e:
+            st.error(f"Error loading saved data: {str(e)}")
+            st.session_state.charging_data = None
+    else:
+        st.session_state.charging_data = None
+
 if 'last_refresh' not in st.session_state:
-    st.session_state.last_refresh = None
+    # If we loaded data, set last refresh to now
+    if st.session_state.charging_data is not None:
+        st.session_state.last_refresh = datetime.now()
+    else:
+        st.session_state.last_refresh = None
+
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'gmail_client' not in st.session_state:
@@ -171,7 +193,7 @@ with st.sidebar:
         st.subheader("Data Retrieval")
         
         # Create tabs for different data sources
-        data_source_tabs = st.tabs(["Gmail Search", "EVCC CSV Upload"])
+        data_source_tabs = st.tabs(["Gmail Search", "EVCC CSV Upload", "PDF Upload", "Data Management"])
         
         # Gmail Search Tab
         with data_source_tabs[0]:
@@ -213,11 +235,60 @@ with st.sidebar:
             
             # Option to replace or merge data
             if uploaded_file is not None:
-                replace_data = st.checkbox(
-                    "Replace existing data with EVCC data", 
+                replace_evcc_data = st.checkbox(
+                    "Replace existing EVCC data", 
                     value=False,
-                    help="When checked, EVCC data will replace all other sources. Otherwise, it will be merged with Gmail data."
+                    help="When checked, new EVCC data will replace any existing EVCC data. Otherwise, it will be merged with all data sources."
                 )
+        
+        # PDF Upload Tab
+        with data_source_tabs[2]:
+            st.write("Upload PDF charging receipts:")
+            st.info("Upload PDF receipts from EV charging stations. The system will extract charging data using OCR.")
+            
+            # Upload PDF files
+            uploaded_pdfs = st.file_uploader(
+                "Choose PDF receipts", 
+                type="pdf",
+                accept_multiple_files=True,
+                help="Upload one or more PDF receipts from EV charging stations"
+            )
+            
+            # Option to replace or merge data
+            if uploaded_pdfs and len(uploaded_pdfs) > 0:
+                replace_pdf_data = st.checkbox(
+                    "Replace existing PDF data", 
+                    value=False,
+                    help="When checked, new PDF data will replace any existing PDF data. Otherwise, it will be merged with all data sources."
+                )
+        
+        # Data Management Tab
+        with data_source_tabs[3]:
+            st.write("Data Management:")
+            
+            # Show currently stored data info
+            stored_data = load_charging_data()
+            if stored_data:
+                st.info(f"You have {len(stored_data)} charging sessions stored in the database.")
+                
+                # Option to clear all data
+                if st.button("Clear All Stored Data", type="secondary"):
+                    if delete_charging_data():
+                        st.success("All stored charging data has been cleared.")
+                        st.session_state.charging_data = None
+                        st.rerun()
+                    else:
+                        st.error("Failed to clear charging data.")
+            else:
+                st.info("No charging data is currently stored in the database.")
+            
+            # Option to enable incremental updates (only fetch new data)
+            st.write("Update Options:")
+            incremental_update = st.checkbox(
+                "Enable incremental updates", 
+                value=True,
+                help="Only retrieve and process new charging data that hasn't been seen before."
+            )
         
         # Fetch data button
         if st.button("Fetch Charging Data"):
@@ -234,8 +305,8 @@ with st.sidebar:
                         evcc_data = parse_evcc_csv(uploaded_file, default_cost_per_kwh=evcc_cost_per_kwh)
                         
                         if evcc_data:
-                            # If replace_data is checked, use only EVCC data
-                            if 'replace_data' in locals() and replace_data:
+                            # If replace_evcc_data is checked, use only EVCC data
+                            if 'replace_evcc_data' in locals() and replace_evcc_data:
                                 all_charging_data = evcc_data
                                 st.success(f"Successfully loaded {len(evcc_data)} charging sessions from EVCC CSV.")
                                 
@@ -256,6 +327,27 @@ with st.sidebar:
                         skip_other_sources = False
             else:
                 skip_other_sources = False
+            
+            # PDF Receipt Processing (if files were uploaded)
+            if 'uploaded_pdfs' in locals() and uploaded_pdfs and len(uploaded_pdfs) > 0:
+                with st.spinner("Processing PDF receipts..."):
+                    try:
+                        # Parse PDF data
+                        pdf_data = parse_multiple_pdfs(uploaded_pdfs)
+                        
+                        if pdf_data:
+                            # If replace_pdf_data is checked, replace existing PDF data
+                            if 'replace_pdf_data' in locals() and replace_pdf_data:
+                                # Filter out any existing PDF data from all_charging_data
+                                all_charging_data = [item for item in all_charging_data if item.get('source') != 'PDF Upload']
+                            
+                            # Add PDF data to combined dataset
+                            all_charging_data.extend(pdf_data)
+                            st.success(f"Successfully extracted data from {len(pdf_data)} PDF receipts.")
+                        else:
+                            st.warning("No charging data could be extracted from the PDF files.")
+                    except Exception as e:
+                        st.error(f"Error processing PDF files: {str(e)}")
             
             # Gmail Data Retrieval (skip if using only EVCC data)
             if not skip_other_sources:
@@ -362,15 +454,60 @@ with st.sidebar:
             # Process combined data if any was retrieved
             if all_charging_data:
                 with st.spinner("Processing charging data..."):
-                    # Clean and process the charging data
-                    df = clean_charging_data(all_charging_data)
+                    # Check if incremental updates are enabled and if we have existing data
+                    if 'incremental_update' in locals() and incremental_update:
+                        # Load existing data
+                        existing_data = load_charging_data()
+                        
+                        if existing_data:
+                            # Merge new data with existing data (avoiding duplicates)
+                            combined_data = merge_charging_data(existing_data, all_charging_data)
+                            st.info(f"Merged {len(all_charging_data)} new charging sessions with {len(existing_data)} existing sessions.")
+                            
+                            # Update session with incremental count
+                            new_sessions_count = len(combined_data) - len(existing_data)
+                            if new_sessions_count > 0:
+                                st.success(f"Added {new_sessions_count} new charging sessions.")
+                            else:
+                                st.info("No new charging sessions found.")
+                                
+                            # Clean and process the combined data
+                            df = clean_charging_data(combined_data)
+                            
+                            # Save the updated data to persistent storage
+                            save_charging_data(combined_data)
+                        else:
+                            # No existing data, just process and save the new data
+                            df = clean_charging_data(all_charging_data)
+                            save_charging_data(all_charging_data)
+                            st.success(f"Saved {len(all_charging_data)} charging sessions to database.")
+                    else:
+                        # Clean and process the new data
+                        df = clean_charging_data(all_charging_data)
+                        
+                        # Save the new data to persistent storage 
+                        # (will overwrite existing data when incremental_update is False)
+                        save_charging_data(all_charging_data)
+                        st.success(f"Saved {len(all_charging_data)} charging sessions to database.")
                     
-                    # Store data in session state
+                    # Store processed data in session state
                     st.session_state.charging_data = df
                     st.session_state.last_refresh = datetime.now()
-                    st.success(f"Successfully processed data from {len(all_charging_data)} total charging sessions.")
+                    st.success(f"Successfully processed data from {len(df)} total charging sessions.")
             else:
-                st.warning("No charging data was retrieved from any source.")
+                # Check if we have existing data to load instead
+                existing_data = load_charging_data()
+                if existing_data:
+                    with st.spinner("Loading stored data..."):
+                        # Process the existing data
+                        df = clean_charging_data(existing_data)
+                        
+                        # Store in session state
+                        st.session_state.charging_data = df
+                        st.session_state.last_refresh = datetime.now()
+                        st.info(f"Loaded {len(df)} charging sessions from database.")
+                else:
+                    st.warning("No charging data was retrieved from any source.")
         
         # Display last refresh time
         if st.session_state.last_refresh:
