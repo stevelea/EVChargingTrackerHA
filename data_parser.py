@@ -328,41 +328,47 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
         csv_data = csv.reader(io.StringIO(content), delimiter=',')
         headers = next(csv_data, None)  # Get headers
         
-        # Check if this is a valid EVCC CSV file
-        required_fields = ['timestamp', 'chargedEnergy']
+        # Remove BOM if present
+        if headers and len(headers) > 0 and headers[0].startswith('\ufeff'):
+            headers[0] = headers[0].replace('\ufeff', '')
+        
+        # Debug the headers
+        st.debug(f"CSV Headers: {headers}")
+        
+        # Check if this is a valid EVCC CSV file by looking for common fields
+        required_fields = ['Created', 'Energy (kWh)']  # Updated required fields for the sample
         has_required_fields = all(field in headers for field in required_fields)
         
         if not has_required_fields:
-            st.error("Invalid EVCC CSV format. Required fields: timestamp, chargedEnergy")
+            st.error(f"Invalid EVCC CSV format. Required fields: {', '.join(required_fields)}")
+            st.info(f"Found headers: {', '.join(headers)}")
             return []
             
-        # Map EVCC CSV columns to our data structure
+        # Map CSV columns to our data structure
         column_mapping = {
-            'timestamp': 'date',
-            'chargedEnergy': 'total_kwh',
-            'chargeDuration': 'duration',
-            'chargeRateAvg': 'avg_kw',
-            'chargeRateMax': 'peak_kw',
-            'vehicleTitle': 'vehicle',
-            'vehicleSoc': 'soc',
-            'vehicleRange': 'range',
-            'vehicleOdometer': 'odometer',
-            'connectorStatus': 'connector',
-            'mode': 'mode',
+            'Created': 'date',
+            'Finished': 'end_date',
+            'Charging point': 'location',
+            'Vehicle': 'vehicle',
+            'Mileage (km)': 'odometer', 
+            'Energy (kWh)': 'total_kwh',
+            'Duration': 'duration',
+            'Price': 'total_cost',
+            'Price/kWh': 'cost_per_kwh'
         }
         
         # Get column indices
         column_indices = {}
-        for evcc_col, our_col in column_mapping.items():
-            if evcc_col in headers:
-                column_indices[our_col] = headers.index(evcc_col)
+        for csv_col, our_col in column_mapping.items():
+            if csv_col in headers:
+                column_indices[our_col] = headers.index(csv_col)
         
         # Process each row
         for row in csv_data:
-            if not row:  # Skip empty rows
+            if not row or len(row) < len(headers):  # Skip empty or incomplete rows
                 continue
                 
-            # Create data entry
+            # Create data entry with default values
             data = {
                 'date': None,
                 'time': None,
@@ -374,11 +380,7 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
                 'cost_per_kwh': default_cost_per_kwh,  # Use default cost
                 'total_cost': None,
                 'vehicle': None,
-                'soc': None,
-                'range': None,
-                'odometer': None,
-                'connector': None,
-                'mode': None,
+                'odometer': None
             }
             
             # Map data from CSV columns
@@ -386,29 +388,54 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
                 if idx < len(row) and row[idx]:
                     data[our_col] = row[idx]
             
-            # Process timestamp
-            if data['date']:
+            # Process start date/time
+            if 'date' in column_indices and row[column_indices['date']]:
                 try:
-                    # Try to parse ISO format (YYYY-MM-DDTHH:MM:SS)
-                    timestamp = pd.to_datetime(data['date'])
+                    # Try to parse format (YYYY-MM-DD HH:MM:SS)
+                    timestamp = pd.to_datetime(row[column_indices['date']])
                     data['date'] = timestamp.date()
                     data['time'] = timestamp.time()
-                except:
+                except Exception as e:
+                    st.debug(f"Date parsing error: {str(e)}")
                     # Fallback to current time
                     now = datetime.now()
                     data['date'] = now.date()
                     data['time'] = now.time()
             
-            # Process numeric values
-            for field in ['total_kwh', 'peak_kw']:
-                if data[field]:
-                    try:
-                        data[field] = float(data[field])
-                    except ValueError:
-                        data[field] = None
+            # Use location data if available
+            if 'location' in column_indices and row[column_indices['location']]:
+                location = row[column_indices['location']].strip()
+                if location:  # Only override default if non-empty
+                    data['location'] = location
             
-            # Calculate total cost if kWh available
-            if data['total_kwh'] is not None and data['cost_per_kwh'] is not None:
+            # Process numeric values - total_kwh
+            if 'total_kwh' in column_indices and row[column_indices['total_kwh']]:
+                try:
+                    data['total_kwh'] = float(row[column_indices['total_kwh']])
+                except ValueError:
+                    data['total_kwh'] = None
+            
+            # Process cost per kWh if available
+            if 'cost_per_kwh' in column_indices and row[column_indices['cost_per_kwh']]:
+                try:
+                    cost_str = row[column_indices['cost_per_kwh']].replace('$', '').strip()
+                    if cost_str:
+                        data['cost_per_kwh'] = float(cost_str)
+                except ValueError:
+                    # Keep default
+                    pass
+            
+            # Process total cost if available
+            if 'total_cost' in column_indices and row[column_indices['total_cost']]:
+                try:
+                    cost_str = row[column_indices['total_cost']].replace('$', '').strip()
+                    if cost_str:
+                        data['total_cost'] = float(cost_str)
+                except ValueError:
+                    data['total_cost'] = None
+            
+            # Calculate total cost if not provided but kWh is available
+            if data['total_cost'] is None and data['total_kwh'] is not None and data['cost_per_kwh'] is not None:
                 data['total_cost'] = data['total_kwh'] * data['cost_per_kwh']
             
             # Skip entries that don't have minimum required data
@@ -417,8 +444,11 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
         
     except Exception as e:
         st.error(f"Error parsing EVCC CSV: {str(e)}")
+        import traceback
+        st.debug(traceback.format_exc())
         return []
     
+    st.success(f"Successfully parsed {len(charging_data)} charging sessions from EVCC CSV")
     return charging_data
 
 def clean_charging_data(charging_data):
