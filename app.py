@@ -16,6 +16,10 @@ from data_storage import (
     convert_to_dataframe, filter_data_by_date_range, delete_charging_data
 )
 from utils import get_date_range, export_data_as_csv, save_credentials, load_credentials
+from location_mapper import display_charging_map
+from predictive_analysis import (
+    forecast_monthly_cost, predict_cost_by_provider, usage_prediction
+)
 
 # Set page configuration
 st.set_page_config(
@@ -71,6 +75,9 @@ if 'dashboard_preferences' not in st.session_state:
             'cost_by_location': {'visible': True, 'order': 7, 'name': 'Cost by Location'},
             'provider_cost_comparison': {'visible': True, 'order': 8, 'name': 'Provider Cost Comparison'},
             'provider_kwh_comparison': {'visible': True, 'order': 9, 'name': 'Provider Energy Comparison'},
+            'monthly_cost_forecast': {'visible': True, 'order': 10, 'name': 'Monthly Cost Forecast'},
+            'provider_trend_prediction': {'visible': True, 'order': 11, 'name': 'Provider Cost Trends'},
+            'usage_prediction': {'visible': True, 'order': 12, 'name': 'Usage Prediction'},
         },
         'layout': 'tabs',  # 'tabs' or 'grid'
         'grid_columns': 2   # Number of columns if using grid layout
@@ -812,6 +819,7 @@ if st.session_state.authenticated:
                 'charging_stats': {'name': 'Charging Statistics', 'charts': ['peak_kw_histogram', 'kwh_by_location', 'charging_duration']},
                 'cost_analysis': {'name': 'Cost Analysis', 'charts': ['cost_time_series', 'cost_per_kwh', 'cost_by_location']},
                 'provider_analysis': {'name': 'Provider Comparison', 'charts': ['provider_cost_comparison', 'provider_kwh_comparison']},
+                'predictive_analysis': {'name': 'Future Predictions', 'charts': ['monthly_cost_forecast', 'provider_trend_prediction', 'usage_prediction']},
                 'raw_data': {'name': 'Raw Data', 'charts': []}
             }
             
