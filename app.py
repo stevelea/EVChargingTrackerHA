@@ -32,7 +32,22 @@ if 'gmail_client' not in st.session_state:
 def get_base_url():
     # Get the base URL for the Streamlit app
     params = st.query_params.get_all("base_url")
-    return params[0] if params else ""
+    
+    # If base_url parameter exists, use it
+    if params:
+        return params[0]
+    
+    # Check if we're running in Replit
+    import os
+    repl_slug = os.environ.get('REPL_SLUG')
+    repl_owner = os.environ.get('REPL_OWNER')
+    
+    # If we're on Replit, construct the URL
+    if repl_slug and repl_owner:
+        return f"https://{repl_slug}.{repl_owner}.replit.app"
+        
+    # Default to empty string if not on Replit and no base_url parameter
+    return ""
 
 # App title and description
 st.title("⚡ EV Charging Data Analyzer")
@@ -42,14 +57,16 @@ st.write("Extract and visualize your EV charging data from Gmail receipts")
 query_params = st.query_params.to_dict()
 if "code" in query_params and "state" in query_params:
     try:
-        # Get the callback URL for authentication
+        # Get the base URL
         base_url = get_base_url()
-        redirect_uri_params = st.query_params.get_all("redirect_uri")
-        redirect_uri_param = redirect_uri_params[0] if redirect_uri_params else "http://localhost:5000"
-        redirect_uri = f"{base_url}/" if base_url else redirect_uri_param
         
-        # Display the redirect URI being used (for troubleshooting)
-        st.info(f"Using redirect URI: {redirect_uri}")
+        # Use the Replit URL if available, otherwise fall back to localhost
+        if base_url:
+            redirect_uri = f"{base_url}/"
+            st.info(f"Using Replit URL for callback: {redirect_uri}")
+        else:
+            redirect_uri = "http://localhost:5000/"
+            st.info(f"Using local URL for callback: {redirect_uri}")
         
         # Process OAuth response
         if st.session_state.gmail_client.authorize_with_params(query_params, redirect_uri):
@@ -73,12 +90,17 @@ with st.sidebar:
         
         # Get the current URL for the redirect_uri
         base_url = get_base_url()
-        redirect_uri_params = st.query_params.get_all("redirect_uri")
-        redirect_uri_param = redirect_uri_params[0] if redirect_uri_params else "http://localhost:5000"
-        redirect_uri = f"{base_url}/" if base_url else redirect_uri_param
         
-        # Display redirect URI (for troubleshooting)
-        st.info(f"Redirect URI: {redirect_uri} - Please add this URL to your Google Cloud Console authorized redirect URIs.")
+        # Use the Replit URL if available, otherwise fall back to localhost
+        if base_url:
+            redirect_uri = f"{base_url}/"
+            st.info(f"Using Replit URL for authentication: {redirect_uri}")
+        else:
+            redirect_uri = "http://localhost:5000/"
+            st.info(f"Using local URL for authentication: {redirect_uri}")
+        
+        # Display redirect URI instructions
+        st.info(f"Please add this URL to your Google Cloud Console authorized redirect URIs: {redirect_uri}")
         
         # Authentication button
         if st.button("Sign in with Google"):
