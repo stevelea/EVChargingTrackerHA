@@ -1003,5 +1003,19 @@
     "cost_per_kwh": null,
     "total_cost": null,
     "id": "72fc4b1b6b3b91c1136d6ffe23648fe6"
+  },
+  {
+    "date": "2025-03-26T15:41:51.582076",
+    "time": null,
+    "location": null,
+    "provider": "Tesla",
+    "total_kwh": 19.393,
+    "peak_kw": null,
+    "duration": null,
+    "cost_per_kwh": null,
+    "total_cost": null,
+    "pdf_filename": "tesla_invoice49d7cdbd-58de-4d40-98fd-d46891e9d842.pdf",
+    "source": "PDF Upload",
+    "id": "182cae214b15c6bdbf58eb07318be449"
   }
 ]
