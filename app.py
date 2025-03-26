@@ -123,8 +123,11 @@ with st.sidebar:
                         # Filter emails by date
                         filtered_emails = []
                         for email in emails:
-                            if email['date'] and start_date <= email['date'] <= end_date:
-                                filtered_emails.append(email)
+                            if email['date']:
+                                # Make naive datetime for comparison (remove timezone info)
+                                email_date = email['date'].replace(tzinfo=None)
+                                if start_date <= email_date <= end_date:
+                                    filtered_emails.append(email)
                         
                         emails_count = len(filtered_emails)
                         st.info(f"Found {emails_count} emails matching your criteria.")
@@ -258,9 +261,10 @@ if st.session_state.authenticated:
             
             if len(date_range) == 2:
                 start_date, end_date = date_range
+                # Make sure date comparison works by converting to same format
                 filtered_data = filtered_data[
-                    (filtered_data['date'] >= start_date) & 
-                    (filtered_data['date'] <= end_date)
+                    (filtered_data['date'].dt.normalize() >= pd.Timestamp(start_date)) & 
+                    (filtered_data['date'].dt.normalize() <= pd.Timestamp(end_date))
                 ]
             
             # Apply sorting
