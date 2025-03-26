@@ -69,14 +69,15 @@ def create_visualizations(data):
                 # Skip columns that can't be converted
     
     # Time series of charging sessions
-    # Use default size for missing values with explicit list
-    peak_kw_values = data['peak_kw'].fillna(5).tolist()
+    # Use default size for missing values with explicit list and ensure numeric values
+    # Convert to standard Python list of float values to avoid Narwhals Series issues
+    peak_kw_values = data['peak_kw'].apply(lambda x: float(x) if pd.notnull(x) else 5.0).tolist()
     
     figures['time_series'] = px.scatter(
         plot_data,  # Use pre-converted data
         x='date',
         y='total_kwh',
-        size=peak_kw_values,  # Pass as explicit list 
+        size=peak_kw_values,  # Pass as explicit list of numeric values
         color='cost_per_kwh',
         hover_name='location',
         hover_data=['provider', 'total_cost', 'peak_kw', 'duration'],
@@ -222,8 +223,8 @@ def create_visualizations(data):
     )
     
     # Cost per kWh over time
-    # Convert size parameter explicitly
-    total_kwh_values = data['total_kwh'].fillna(5).tolist()  # Use default size for missing values
+    # Convert size parameter explicitly and ensure it's properly converted to numeric values
+    total_kwh_values = data['total_kwh'].apply(lambda x: float(x) if pd.notnull(x) else 5.0).tolist()
     
     figures['cost_per_kwh'] = px.scatter(
         plot_data,  # Use pre-converted data
@@ -247,8 +248,8 @@ def create_visualizations(data):
     )
     
     # Charging duration analysis
-    # Convert size parameter to list
-    total_cost_values = data['total_cost'].fillna(5).tolist()  # Use default size for missing values
+    # Convert size parameter to list and ensure it contains proper numeric values
+    total_cost_values = data['total_cost'].apply(lambda x: float(x) if pd.notnull(x) else 5.0).tolist()
     
     figures['charging_duration'] = px.scatter(
         plot_data,  # Use pre-converted data

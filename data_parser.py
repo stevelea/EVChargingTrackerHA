@@ -335,6 +335,12 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
         
         # Check if this is a valid EVCC CSV file by looking for common fields
         required_fields = ['Created', 'Energy (kWh)']  # Updated required fields for the sample
+        
+        # Make sure headers is not None before checking
+        if headers is None:
+            st.error("CSV file appears to be empty or invalid.")
+            return []
+            
         has_required_fields = all(field in headers for field in required_fields)
         
         if not has_required_fields:
@@ -358,7 +364,8 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
         # Get column indices
         column_indices = {}
         for csv_col, our_col in column_mapping.items():
-            if csv_col in headers:
+            # headers is already checked for None above
+            if headers and csv_col in headers:
                 column_indices[our_col] = headers.index(csv_col)
         
         # Process each row

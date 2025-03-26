@@ -658,6 +658,53 @@ if st.session_state.authenticated:
                     
                     elif group['name'] == 'Raw Data':
                         st.subheader("Raw Data")
+                        
+                        # Add filters similar to grid view
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            location_filter = st.multiselect(
+                                "Filter by Location",
+                                options=data['location'].unique(),
+                                default=[]
+                            )
+                        
+                        with col2:
+                            min_date, max_date = data['date'].min(), data['date'].max()
+                            date_range = st.date_input(
+                                "Date range",
+                                [min_date, max_date],
+                                min_value=min_date,
+                                max_value=max_date
+                            )
+                        
+                        with col3:
+                            sort_by = st.selectbox(
+                                "Sort by",
+                                options=['date', 'total_kwh', 'peak_kw', 'total_cost', 'cost_per_kwh'],
+                                index=0
+                            )
+                            sort_order = st.radio("Order", ["Descending", "Ascending"], horizontal=True)
+                        
+                        # Apply filters
+                        filtered_data = data.copy()
+                        
+                        if location_filter:
+                            filtered_data = filtered_data[filtered_data['location'].isin(location_filter)]
+                        
+                        if len(date_range) == 2:
+                            start_date, end_date = date_range
+                            # Make sure date comparison works by converting to same format
+                            filtered_data = filtered_data[
+                                (filtered_data['date'].dt.normalize() >= pd.Timestamp(start_date)) & 
+                                (filtered_data['date'].dt.normalize() <= pd.Timestamp(end_date))
+                            ]
+                        
+                        # Apply sorting
+                        ascending = sort_order == "Ascending"
+                        filtered_data = filtered_data.sort_values(by=sort_by, ascending=ascending)
+                        
+                        # Show data table
+                        st.dataframe(filtered_data)
         
         else:  # Grid layout
             # Create a list of visible visualizations sorted by order
