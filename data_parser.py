@@ -138,7 +138,7 @@ def parse_charging_emails(emails):
             
             # Detect and set the provider based on email subject and body
             if is_ampol:
-                data['provider'] = 'Ampol AmpCharge'
+                data['provider'] = 'AmpCharge'
             elif 'evie' in email_subject.lower() or 'evie' in email_body.lower():
                 data['provider'] = 'Evie Networks'
             elif 'chargefox' in email_subject.lower() or 'chargefox' in email_body.lower():
@@ -153,6 +153,8 @@ def parse_charging_emails(emails):
                 data['provider'] = 'Jolt'
             elif 'evup' in email_subject.lower() or 'evup' in email_body.lower():
                 data['provider'] = 'EVUP'
+            elif 'bp pulse' in email_subject.lower() or 'bp pulse' in email_body.lower():
+                data['provider'] = 'BPPulse'
             else:
                 # Try to extract from location or station info if available
                 # Default to "Unknown" if we can't identify the provider
@@ -160,7 +162,6 @@ def parse_charging_emails(emails):
             
             # Use Ampol specific patterns if this is an Ampol email
             if is_ampol:
-                st.debug("Parsing Ampol AmpCharge receipt")
                 # Try to extract each piece of data using Ampol-specific patterns
                 for field, field_patterns in ampol_patterns.items():
                     for pattern in field_patterns:
