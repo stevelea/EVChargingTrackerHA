@@ -133,25 +133,18 @@ def parse_charging_emails(emails):
                     data['date'] = datetime.now()
                 
                 # Normalize timezone handling
-                # First, if the date is timezone-naive, make it timezone-aware (UTC)
-                if hasattr(data['date'], 'tzinfo') and data['date'].tzinfo is None:
-                    try:
-                        import pytz
-                        data['date'] = data['date'].replace(tzinfo=pytz.UTC)
-                    except ImportError:
-                        # If pytz is not available, use simpler approach
-                        try:
-                            from datetime import timezone
-                            data['date'] = data['date'].replace(tzinfo=timezone.utc)
-                        except:
-                            pass  # If replace fails, keep the original
-                
-                # Then, strip timezone info to make all dates timezone-naive
-                if hasattr(data['date'], 'tzinfo') and data['date'].tzinfo is not None:
-                    try:
-                        data['date'] = data['date'].replace(tzinfo=None)
-                    except:
-                        pass  # If replace fails, keep the original
+                # Simply ensure date is a datetime object and standardize to naive datetime
+                # This simplifies comparison between dates without timezone issues
+                # Extract just the date part and don't bother with timezone information
+                try:
+                    # If it's already a datetime, just get year, month, day and create new naive datetime
+                    year = data['date'].year
+                    month = data['date'].month
+                    day = data['date'].day
+                    data['date'] = datetime(year, month, day)
+                except:
+                    # If extraction fails for any reason, keep the original
+                    pass
                 
             elif email.get('date'):
                 # Use email date as fallback (might be timezone-aware)

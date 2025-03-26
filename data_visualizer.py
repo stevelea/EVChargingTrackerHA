@@ -49,12 +49,24 @@ def create_visualizations(data):
     # Pre-convert all series to lists for plotly
     # This prevents the "narwhals.stable.v1.Series" error
     plot_data = data.copy()
+    
+    # First ensure all numeric columns are proper Python floats
     for column in plot_data.columns:
-        if not pd.api.types.is_datetime64_any_dtype(plot_data[column]):
+        if column in ['total_kwh', 'peak_kw', 'cost_per_kwh', 'total_cost']:
             try:
+                # Convert to numeric first, then fill NaN values, then convert to Python list
+                plot_data[column] = pd.to_numeric(plot_data[column], errors='coerce').fillna(0).tolist()
+            except Exception as e:
+                print(f"Error converting {column}: {str(e)}")
+                # If conversion fails, use a list of zeros with the same length
+                plot_data[column] = [0] * len(plot_data)
+        elif not pd.api.types.is_datetime64_any_dtype(plot_data[column]):
+            try:
+                # For non-numeric, non-datetime columns, just convert to list
                 plot_data[column] = plot_data[column].tolist()
-            except:
-                pass  # Skip columns that can't be converted
+            except Exception as e:
+                print(f"Error converting {column}: {str(e)}")
+                # Skip columns that can't be converted
     
     # Time series of charging sessions
     # Use default size for missing values with explicit list
