@@ -13,7 +13,8 @@ from pdf_parser import parse_multiple_pdfs
 from data_visualizer import create_visualizations
 from data_storage import (
     load_charging_data, save_charging_data, merge_charging_data, 
-    convert_to_dataframe, filter_data_by_date_range, delete_charging_data
+    convert_to_dataframe, filter_data_by_date_range, delete_charging_data,
+    filter_records_by_criteria, delete_selected_records
 )
 from utils import get_date_range, export_data_as_csv, save_credentials, load_credentials
 from location_mapper import display_charging_map
@@ -283,14 +284,178 @@ with st.sidebar:
             if stored_data:
                 st.info(f"You have {len(stored_data)} charging sessions stored in the database.")
                 
-                # Option to clear all data
-                if st.button("Clear All Stored Data", type="secondary"):
-                    if delete_charging_data():
-                        st.success("All stored charging data has been cleared.")
-                        st.session_state.charging_data = None
-                        st.rerun()
+                # Data Management Tabs
+                data_mgmt_tabs = st.tabs(["Selective Delete", "Delete All"])
+                
+                # Selective Delete Tab
+                with data_mgmt_tabs[0]:
+                    st.subheader("Selectively Delete Records")
+                    
+                    # Initialize session state variables for selective deletion
+                    if 'selected_records_to_delete' not in st.session_state:
+                        st.session_state.selected_records_to_delete = []
+                        
+                    if 'records_to_display' not in st.session_state:
+                        st.session_state.records_to_display = stored_data
+                        
+                    # Filter options  
+                    filter_col1, filter_col2 = st.columns(2)
+                    
+                    with filter_col1:
+                        # Get unique providers
+                        providers = ["All"] + sorted(set(record.get('provider', 'Unknown') for record in stored_data))
+                        selected_provider = st.selectbox("Filter by Provider:", providers, key="delete_provider_filter")
+                    
+                    with filter_col2:
+                        # Get unique sources
+                        sources = ["All"] + sorted(set(record.get('source', 'Unknown') for record in stored_data if record.get('source')))
+                        selected_source = st.selectbox("Filter by Source:", sources, key="delete_source_filter")
+                    
+                    # Date range filter
+                    min_date = min((record.get('date') for record in stored_data if record.get('date')), default=datetime.now() - timedelta(days=365))
+                    max_date = max((record.get('date') for record in stored_data if record.get('date')), default=datetime.now())
+                    
+                    # Format dates for display in the date input
+                    min_date_str = min_date.strftime('%Y-%m-%d') if isinstance(min_date, datetime) else min_date
+                    max_date_str = max_date.strftime('%Y-%m-%d') if isinstance(max_date, datetime) else max_date
+                    
+                    date_col1, date_col2 = st.columns(2)
+                    with date_col1:
+                        start_date = st.date_input("From Date:", min_date, key="delete_start_date")
+                    with date_col2:
+                        end_date = st.date_input("To Date:", max_date, key="delete_end_date")
+                    
+                    # Create criteria dictionary for filtering
+                    filter_criteria = {}
+                    
+                    if selected_provider != "All":
+                        filter_criteria['provider'] = selected_provider
+                    
+                    if selected_source != "All":
+                        filter_criteria['source'] = selected_source
+                    
+                    # Add date range
+                    if start_date and end_date:
+                        # Convert to datetime for consistent comparison
+                        start_datetime = datetime.combine(start_date, datetime.min.time())
+                        end_datetime = datetime.combine(end_date, datetime.max.time())
+                        filter_criteria['date_range'] = (start_datetime, end_datetime)
+                    
+                    # Apply filters button
+                    if st.button("Apply Filters"):
+                        # Apply the filters
+                        st.session_state.records_to_display = filter_records_by_criteria(filter_criteria)
+                        # Clear previous selections when filters change
+                        st.session_state.selected_records_to_delete = []
+                        st.success(f"Found {len(st.session_state.records_to_display)} records matching your criteria.")
+                    
+                    # Reset filters button
+                    if st.button("Reset Filters"):
+                        st.session_state.records_to_display = stored_data
+                        st.session_state.selected_records_to_delete = []
+                        st.success("Filters reset.")
+                    
+                    # Create a DataFrame for display
+                    if st.session_state.records_to_display:
+                        # Create a simpler version of the data for the table
+                        table_data = []
+                        for record in st.session_state.records_to_display:
+                            # Format date for display
+                            date_str = record.get('date', '')
+                            if isinstance(date_str, datetime):
+                                date_str = date_str.strftime('%Y-%m-%d')
+                                
+                            # Add a row for each record
+                            table_data.append({
+                                'ID': record.get('id', ''),
+                                'Date': date_str,
+                                'Provider': record.get('provider', 'Unknown'),
+                                'Location': record.get('location', 'Unknown'),
+                                'kWh': record.get('total_kwh', 0),
+                                'Cost': record.get('total_cost', 0),
+                                'Source': record.get('source', 'Unknown')
+                            })
+                        
+                        # Convert to DataFrame
+                        df_display = pd.DataFrame(table_data)
+                        
+                        # Display the table with checkboxes for selection
+                        st.write("Select records to delete:")
+                        
+                        # Display in pages if there are many records
+                        records_per_page = 10
+                        total_pages = (len(df_display) + records_per_page - 1) // records_per_page
+                        
+                        # Page selector
+                        if total_pages > 1:
+                            page = st.number_input("Page", min_value=1, max_value=total_pages, value=1)
+                        else:
+                            page = 1
+                            
+                        # Get the current page data
+                        start_idx = (page - 1) * records_per_page
+                        end_idx = min(start_idx + records_per_page, len(df_display))
+                        df_page = df_display.iloc[start_idx:end_idx]
+                        
+                        # Create checkboxes for each row
+                        for idx, row in df_page.iterrows():
+                            record_id = row['ID']
+                            col1, col2 = st.columns([1, 10])
+                            
+                            with col1:
+                                if st.checkbox("", key=f"delete_{record_id}", 
+                                              value=record_id in st.session_state.selected_records_to_delete):
+                                    if record_id not in st.session_state.selected_records_to_delete:
+                                        st.session_state.selected_records_to_delete.append(record_id)
+                                else:
+                                    if record_id in st.session_state.selected_records_to_delete:
+                                        st.session_state.selected_records_to_delete.remove(record_id)
+                            
+                            with col2:
+                                st.write(f"**{row['Date']}** | {row['Provider']} | {row['Location']} | {row['kWh']:.2f} kWh | ${row['Cost']:.2f} | Source: {row['Source']}")
+                        
+                        # Show selection summary and delete button
+                        if st.session_state.selected_records_to_delete:
+                            st.info(f"Selected {len(st.session_state.selected_records_to_delete)} records to delete.")
+                            
+                            # Confirm deletion
+                            if st.button("Delete Selected Records", type="primary"):
+                                success, count = delete_selected_records(st.session_state.selected_records_to_delete)
+                                if success:
+                                    st.success(f"Successfully deleted {count} records.")
+                                    # Reset selections
+                                    st.session_state.selected_records_to_delete = []
+                                    # Reload data
+                                    stored_data = load_charging_data()
+                                    st.session_state.records_to_display = stored_data
+                                    # Update main data
+                                    if stored_data:
+                                        st.session_state.charging_data = clean_charging_data(stored_data)
+                                    else:
+                                        st.session_state.charging_data = None
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to delete records.")
+                        else:
+                            st.write("Select records to delete using the checkboxes.")
                     else:
-                        st.error("Failed to clear charging data.")
+                        st.warning("No records found matching your criteria.")
+                
+                # Delete All Tab
+                with data_mgmt_tabs[1]:
+                    st.subheader("Delete All Data")
+                    st.warning("This will permanently delete all your stored charging data. This action cannot be undone.")
+                    
+                    # Option to clear all data
+                    if st.button("Clear All Stored Data", type="secondary"):
+                        confirm = st.checkbox("I understand this will delete all my data", key="confirm_delete_all")
+                        if confirm and st.button("Confirm Delete All Data", type="primary"):
+                            if delete_charging_data():
+                                st.success("All stored charging data has been cleared.")
+                                st.session_state.charging_data = None
+                                st.rerun()
+                            else:
+                                st.error("Failed to clear charging data.")
             else:
                 st.info("No charging data is currently stored in the database.")
             

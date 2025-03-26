@@ -314,3 +314,92 @@ def delete_charging_data():
         os.remove(CHARGING_DATA_FILE)
         return True
     return False
+
+def delete_selected_records(record_ids):
+    """
+    Delete selected records by their IDs
+    
+    Args:
+        record_ids: List of record IDs to delete
+        
+    Returns:
+        Tuple of (success, count) indicating if operation succeeded and how many records were deleted
+    """
+    ensure_data_directory()
+    
+    if not os.path.exists(CHARGING_DATA_FILE):
+        return False, 0
+    
+    try:
+        # Load existing data
+        existing_data = load_charging_data()
+        
+        # Create a set of IDs to delete for faster lookup
+        ids_to_delete = set(record_ids)
+        
+        # Filter out records with matching IDs
+        new_data = [record for record in existing_data if record.get('id') not in ids_to_delete]
+        
+        # Calculate how many records were deleted
+        records_deleted = len(existing_data) - len(new_data)
+        
+        # Save the updated data
+        save_charging_data(new_data)
+        
+        return True, records_deleted
+    except Exception as e:
+        st.error(f"Error deleting selected records: {str(e)}")
+        return False, 0
+
+def filter_records_by_criteria(criteria):
+    """
+    Filter records by multiple criteria
+    
+    Args:
+        criteria: Dictionary of field-value pairs to filter on
+        
+    Returns:
+        List of records matching all criteria
+    """
+    data = load_charging_data()
+    
+    if not data:
+        return []
+    
+    filtered_data = data.copy()
+    
+    # Apply each criteria as a filter
+    for field, value in criteria.items():
+        if field == 'date_range':
+            # Special case for date range
+            start_date, end_date = value
+            filtered_data = filter_data_by_date_range(filtered_data, start_date, end_date)
+        elif field == 'provider':
+            # Filter by provider
+            if value != "All":  # Skip if "All" is selected
+                filtered_data = [record for record in filtered_data if record.get('provider') == value]
+        elif field == 'location':
+            # Filter by location (partial match)
+            filtered_data = [record for record in filtered_data 
+                            if record.get('location') and value.lower() in record.get('location', '').lower()]
+        elif field == 'source':
+            # Filter by data source
+            filtered_data = [record for record in filtered_data if record.get('source') == value]
+        elif field == 'min_cost':
+            # Filter by minimum cost
+            filtered_data = [record for record in filtered_data 
+                            if record.get('total_cost') is not None and float(record.get('total_cost', 0)) >= float(value)]
+        elif field == 'max_cost':
+            # Filter by maximum cost
+            filtered_data = [record for record in filtered_data 
+                            if record.get('total_cost') is not None and float(record.get('total_cost', 0)) <= float(value)]
+        elif field == 'min_kwh':
+            # Filter by minimum kWh
+            filtered_data = [record for record in filtered_data 
+                            if record.get('total_kwh') is not None and float(record.get('total_kwh', 0)) >= float(value)]
+        elif field == 'max_kwh':
+            # Filter by maximum kWh
+            filtered_data = [record for record in filtered_data 
+                            if record.get('total_kwh') is not None and float(record.get('total_kwh', 0)) <= float(value)]
+    
+    return filtered_data
