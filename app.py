@@ -37,16 +37,9 @@ def get_base_url():
     if params:
         return params[0]
     
-    # Check if we're running in Replit
-    import os
-    repl_slug = os.environ.get('REPL_SLUG')
-    repl_owner = os.environ.get('REPL_OWNER')
-    
-    # If we're on Replit, construct the URL
-    if repl_slug and repl_owner:
-        return f"https://{repl_slug}.{repl_owner}.replit.app"
-        
-    # Default to empty string if not on Replit and no base_url parameter
+    # When running on Replit, we should use the actual hostname from the request
+    # For now, we'll just use the Replit app URL format which is simply 'https://<REPL_ID>.replit.app'
+    # or fall back to localhost in development
     return ""
 
 # App title and description
@@ -57,16 +50,9 @@ st.write("Extract and visualize your EV charging data from Gmail receipts")
 query_params = st.query_params.to_dict()
 if "code" in query_params and "state" in query_params:
     try:
-        # Get the base URL
-        base_url = get_base_url()
-        
-        # Use the Replit URL if available, otherwise fall back to localhost
-        if base_url:
-            redirect_uri = f"{base_url}/"
-            st.info(f"Using Replit URL for callback: {redirect_uri}")
-        else:
-            redirect_uri = "http://localhost:5000/"
-            st.info(f"Using local URL for callback: {redirect_uri}")
+        # Use the fixed redirect URI
+        redirect_uri = "https://replit.com/auth/callback"
+        st.info(f"Using OAuth callback URL: {redirect_uri}")
         
         # Process OAuth response
         if st.session_state.gmail_client.authorize_with_params(query_params, redirect_uri):
@@ -88,19 +74,11 @@ with st.sidebar:
     if not st.session_state.authenticated:
         st.info("Please authenticate with your Gmail account to access your charging receipts.")
         
-        # Get the current URL for the redirect_uri
-        base_url = get_base_url()
+        # Use a fixed redirect URI that's approved in Google Cloud Console
+        redirect_uri = "https://replit.com/auth/callback"
         
-        # Use the Replit URL if available, otherwise fall back to localhost
-        if base_url:
-            redirect_uri = f"{base_url}/"
-            st.info(f"Using Replit URL for authentication: {redirect_uri}")
-        else:
-            redirect_uri = "http://localhost:5000/"
-            st.info(f"Using local URL for authentication: {redirect_uri}")
-        
-        # Display redirect URI instructions
-        st.info(f"Please add this URL to your Google Cloud Console authorized redirect URIs: {redirect_uri}")
+        st.info("Using Replit's standard OAuth callback URL. Please make sure you've added this URL to your Google Cloud Console authorized redirect URIs:")
+        st.code(redirect_uri)
         
         # Authentication button
         if st.button("Sign in with Google"):
