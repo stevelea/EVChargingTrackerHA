@@ -2,6 +2,8 @@ import re
 from datetime import datetime
 import pandas as pd
 import streamlit as st
+import io
+import csv
 
 def parse_charging_emails(emails):
     """
@@ -298,6 +300,124 @@ def parse_charging_emails(emails):
             # Log the error and continue with next email
             st.warning(f"Error parsing email: {str(e)}")
             continue
+    
+    return charging_data
+
+def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
+    """
+    Parse charging data from EVCC CSV export file.
+    
+    Args:
+        csv_file: File object containing EVCC CSV data
+        default_cost_per_kwh: Default cost per kWh to use for EVCC sessions (default: 0.21)
+        
+    Returns:
+        List of dictionaries containing extracted charging data
+    """
+    charging_data = []
+    
+    try:
+        # Read CSV content
+        content = csv_file.read()
+        
+        # Handle byte string if needed
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
+            
+        # Create CSV reader
+        csv_data = csv.reader(io.StringIO(content), delimiter=',')
+        headers = next(csv_data, None)  # Get headers
+        
+        # Check if this is a valid EVCC CSV file
+        required_fields = ['timestamp', 'chargedEnergy']
+        has_required_fields = all(field in headers for field in required_fields)
+        
+        if not has_required_fields:
+            st.error("Invalid EVCC CSV format. Required fields: timestamp, chargedEnergy")
+            return []
+            
+        # Map EVCC CSV columns to our data structure
+        column_mapping = {
+            'timestamp': 'date',
+            'chargedEnergy': 'total_kwh',
+            'chargeDuration': 'duration',
+            'chargeRateAvg': 'avg_kw',
+            'chargeRateMax': 'peak_kw',
+            'vehicleTitle': 'vehicle',
+            'vehicleSoc': 'soc',
+            'vehicleRange': 'range',
+            'vehicleOdometer': 'odometer',
+            'connectorStatus': 'connector',
+            'mode': 'mode',
+        }
+        
+        # Get column indices
+        column_indices = {}
+        for evcc_col, our_col in column_mapping.items():
+            if evcc_col in headers:
+                column_indices[our_col] = headers.index(evcc_col)
+        
+        # Process each row
+        for row in csv_data:
+            if not row:  # Skip empty rows
+                continue
+                
+            # Create data entry
+            data = {
+                'date': None,
+                'time': None,
+                'location': 'EVCC Charger',  # Default location
+                'provider': 'EVCC',  # Set provider to EVCC
+                'total_kwh': None,
+                'peak_kw': None,
+                'duration': None,
+                'cost_per_kwh': default_cost_per_kwh,  # Use default cost
+                'total_cost': None,
+                'vehicle': None,
+                'soc': None,
+                'range': None,
+                'odometer': None,
+                'connector': None,
+                'mode': None,
+            }
+            
+            # Map data from CSV columns
+            for our_col, idx in column_indices.items():
+                if idx < len(row) and row[idx]:
+                    data[our_col] = row[idx]
+            
+            # Process timestamp
+            if data['date']:
+                try:
+                    # Try to parse ISO format (YYYY-MM-DDTHH:MM:SS)
+                    timestamp = pd.to_datetime(data['date'])
+                    data['date'] = timestamp.date()
+                    data['time'] = timestamp.time()
+                except:
+                    # Fallback to current time
+                    now = datetime.now()
+                    data['date'] = now.date()
+                    data['time'] = now.time()
+            
+            # Process numeric values
+            for field in ['total_kwh', 'peak_kw']:
+                if data[field]:
+                    try:
+                        data[field] = float(data[field])
+                    except ValueError:
+                        data[field] = None
+            
+            # Calculate total cost if kWh available
+            if data['total_kwh'] is not None and data['cost_per_kwh'] is not None:
+                data['total_cost'] = data['total_kwh'] * data['cost_per_kwh']
+            
+            # Skip entries that don't have minimum required data
+            if data['date'] is not None and data['total_kwh'] is not None:
+                charging_data.append(data)
+        
+    except Exception as e:
+        st.error(f"Error parsing EVCC CSV: {str(e)}")
+        return []
     
     return charging_data
 

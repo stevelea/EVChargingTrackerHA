@@ -170,90 +170,159 @@ with st.sidebar:
     if st.session_state.authenticated:
         st.subheader("Data Retrieval")
         
-        # Date range selection
-        st.write("Select date range for email search:")
-        days_back = st.slider("Days to look back", 30, 365, 90)
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days_back)
+        # Create tabs for different data sources
+        data_source_tabs = st.tabs(["Gmail Search", "EVCC CSV Upload"])
         
-        st.write(f"From: {start_date.strftime('%Y-%m-%d')}")
-        st.write(f"To: {end_date.strftime('%Y-%m-%d')}")
+        # Gmail Search Tab
+        with data_source_tabs[0]:
+            # Date range selection
+            st.write("Select date range for email search:")
+            days_back = st.slider("Days to look back", 30, 365, 90)
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days_back)
+            
+            st.write(f"From: {start_date.strftime('%Y-%m-%d')}")
+            st.write(f"To: {end_date.strftime('%Y-%m-%d')}")
+            
+            # Search query options
+            st.write("Search options:")
+            default_search = "EV charging receipt OR Ampol AmpCharge OR charging session"
+            search_label = st.text_input("Email search term", default_search)
+            st.caption("You can use 'OR' to search for multiple terms. The app will search both subject and body content for each term.")
         
-        # Search query options
-        st.write("Search options:")
-        default_search = "EV charging receipt OR Ampol AmpCharge OR charging session"
-        search_label = st.text_input("Email search term", default_search)
-        st.caption("You can use 'OR' to search for multiple terms. The app will search both subject and body content for each term.")
+        # EVCC CSV Upload Tab
+        with data_source_tabs[1]:
+            st.write("Upload EVCC charging data from CSV export:")
+            
+            # Cost per kWh for EVCC data
+            evcc_cost_per_kwh = st.number_input(
+                "Default cost per kWh for EVCC sessions ($)", 
+                min_value=0.0, 
+                max_value=2.0, 
+                value=0.21, 
+                step=0.01,
+                format="%.2f"
+            )
+            
+            # Upload field
+            uploaded_file = st.file_uploader(
+                "Choose EVCC CSV file", 
+                type="csv", 
+                help="Upload a CSV file exported from EVCC"
+            )
+            
+            # Option to replace or merge data
+            if uploaded_file is not None:
+                replace_data = st.checkbox(
+                    "Replace existing data with EVCC data", 
+                    value=False,
+                    help="When checked, EVCC data will replace all other sources. Otherwise, it will be merged with Gmail data."
+                )
         
         # Fetch data button
         if st.button("Fetch Charging Data"):
             all_charging_data = []
             
-            # Gmail Data Retrieval
-            with st.spinner("Fetching email data..."):
-                try:
-                    # Use just search term for now (IMAP search is more limited with complex queries)
-                    # Get emails
-                    gmail_client = st.session_state.gmail_client
-                    emails = gmail_client.get_emails(
-                        query=search_label
-                    )
-                    
-                    # Apply date filtering in Python rather than in IMAP
-                    if emails:
-                        # Filter emails by date
-                        filtered_emails = []
-                        for email in emails:
-                            if email['date']:
-                                # Make naive datetime for comparison (remove timezone info)
-                                email_date = email['date'].replace(tzinfo=None)
-                                if start_date <= email_date <= end_date:
-                                    filtered_emails.append(email)
+            # EVCC CSV Processing (if file was uploaded)
+            if 'uploaded_file' in locals() and uploaded_file is not None:
+                with st.spinner("Processing EVCC CSV data..."):
+                    try:
+                        # Reset file pointer to beginning (in case it was previously read)
+                        uploaded_file.seek(0)
                         
-                        emails_count = len(filtered_emails)
-                        st.info(f"Found {emails_count} emails matching your criteria.")
+                        # Parse EVCC CSV data
+                        evcc_data = parse_evcc_csv(uploaded_file, default_cost_per_kwh=evcc_cost_per_kwh)
                         
-                        # Parse emails to extract charging data
-                        with st.spinner("Parsing email data..."):
-                            email_charging_data = parse_charging_emails(filtered_emails)
-                            
-                            if email_charging_data:
-                                all_charging_data.extend(email_charging_data)
-                                st.success(f"Successfully extracted data from {len(email_charging_data)} charging sessions in emails.")
+                        if evcc_data:
+                            # If replace_data is checked, use only EVCC data
+                            if 'replace_data' in locals() and replace_data:
+                                all_charging_data = evcc_data
+                                st.success(f"Successfully loaded {len(evcc_data)} charging sessions from EVCC CSV.")
+                                
+                                # Skip further data retrieval
+                                skip_other_sources = True
                             else:
-                                st.warning("No charging data could be extracted from the emails.")
-                    else:
-                        st.warning("No emails found matching your search criteria.")
-                    
-                    # Make sure to properly close the IMAP connection when done
+                                # Otherwise, add EVCC data to the combined dataset
+                                all_charging_data.extend(evcc_data)
+                                st.success(f"Successfully loaded {len(evcc_data)} charging sessions from EVCC CSV.")
+                                
+                                # Continue with other data sources
+                                skip_other_sources = False
+                        else:
+                            st.warning("No valid charging data found in the EVCC CSV file.")
+                            skip_other_sources = False
+                    except Exception as e:
+                        st.error(f"Error processing EVCC CSV: {str(e)}")
+                        skip_other_sources = False
+            else:
+                skip_other_sources = False
+            
+            # Gmail Data Retrieval (skip if using only EVCC data)
+            if not skip_other_sources:
+                with st.spinner("Fetching email data..."):
                     try:
-                        gmail_client.close()
-                    except:
-                        pass
+                        # Use just search term for now (IMAP search is more limited with complex queries)
+                        # Get emails
+                        gmail_client = st.session_state.gmail_client
+                        emails = gmail_client.get_emails(
+                            query=search_label
+                        )
                         
-                except Exception as e:
-                    # On error, still try to close the connection
-                    try:
-                        gmail_client.close()
-                    except:
-                        pass
+                        # Apply date filtering in Python rather than in IMAP
+                        if emails:
+                            # Filter emails by date
+                            filtered_emails = []
+                            for email in emails:
+                                if email['date']:
+                                    # Make naive datetime for comparison (remove timezone info)
+                                    email_date = email['date'].replace(tzinfo=None)
+                                    if start_date <= email_date <= end_date:
+                                        filtered_emails.append(email)
+                            
+                            emails_count = len(filtered_emails)
+                            st.info(f"Found {emails_count} emails matching your criteria.")
+                            
+                            # Parse emails to extract charging data
+                            with st.spinner("Parsing email data..."):
+                                email_charging_data = parse_charging_emails(filtered_emails)
+                                
+                                if email_charging_data:
+                                    all_charging_data.extend(email_charging_data)
+                                    st.success(f"Successfully extracted data from {len(email_charging_data)} charging sessions in emails.")
+                                else:
+                                    st.warning("No charging data could be extracted from the emails.")
+                        else:
+                            st.warning("No emails found matching your search criteria.")
                         
-                    # Show error message
-                    error_message = str(e)
-                    if "LOGOUT" in error_message:
-                        st.error("Connection error with Gmail. Please try again or log out and log back in.")
-                        # Attempt to reconnect
+                        # Make sure to properly close the IMAP connection when done
                         try:
-                            st.session_state.gmail_client = GmailClient()
-                            if st.session_state.gmail_client.authenticate(
-                                email_address=gmail_client.email_address, 
-                                app_password=gmail_client.app_password
-                            ):
-                                st.info("Connection restored. Please try searching again.")
+                            gmail_client.close()
                         except:
-                            st.error("Could not automatically restore the connection. Please log out and log back in.")
-                    else:
-                        st.error(f"Error fetching email data: {error_message}")
+                            pass
+                            
+                    except Exception as e:
+                        # On error, still try to close the connection
+                        try:
+                            gmail_client.close()
+                        except:
+                            pass
+                            
+                        # Show error message
+                        error_message = str(e)
+                        if "LOGOUT" in error_message:
+                            st.error("Connection error with Gmail. Please try again or log out and log back in.")
+                            # Attempt to reconnect
+                            try:
+                                st.session_state.gmail_client = GmailClient()
+                                if st.session_state.gmail_client.authenticate(
+                                    email_address=gmail_client.email_address, 
+                                    app_password=gmail_client.app_password
+                                ):
+                                    st.info("Connection restored. Please try searching again.")
+                            except:
+                                st.error("Could not automatically restore the connection. Please log out and log back in.")
+                        else:
+                            st.error(f"Error fetching email data: {error_message}")
             
             # Tesla API Data Retrieval (if authenticated)
             if st.session_state.tesla_authenticated:
