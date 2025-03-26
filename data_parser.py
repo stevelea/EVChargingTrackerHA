@@ -189,15 +189,19 @@ def parse_charging_emails(emails):
                     # Last resort fallback to today (timezone-naive)
                     data['date'] = datetime.now()
                 
-                # Normalize timezone handling
-                # Simply ensure date is a datetime object and standardize to naive datetime
-                # This simplifies comparison between dates without timezone issues
-                # Extract just the date part and don't bother with timezone information
+                # Normalize timezone handling and extract time if needed
                 try:
-                    # If it's already a datetime, just get year, month, day and create new naive datetime
+                    # If it's already a datetime, get date and time parts separately
                     year = data['date'].year
                     month = data['date'].month
                     day = data['date'].day
+                    
+                    # If we don't have a time component yet, extract it from the datetime
+                    if data['time'] is None and hasattr(data['date'], 'hour') and hasattr(data['date'], 'minute'):
+                        # Extract time part from the datetime to the time field
+                        data['time'] = data['date'].time()
+                    
+                    # Set date to just the date part (no time)
                     data['date'] = datetime(year, month, day)
                 except:
                     # If extraction fails for any reason, keep the original
@@ -207,28 +211,52 @@ def parse_charging_emails(emails):
                 # Use email date as fallback (might be timezone-aware)
                 data['date'] = email['date']
                 
+                # If we don't have a time component yet, extract it from the email date
+                if data['time'] is None and hasattr(data['date'], 'hour') and hasattr(data['date'], 'minute'):
+                    # Extract time part from the datetime to the time field
+                    data['time'] = data['date'].time()
+                
                 # Normalize timezone
                 if hasattr(data['date'], 'tzinfo') and data['date'].tzinfo is not None:
                     try:
                         data['date'] = data['date'].replace(tzinfo=None)
                     except:
                         pass  # If replace fails, keep the original
+                        
+                # Strip time component from date (keep only the date part)
+                try:
+                    year = data['date'].year
+                    month = data['date'].month
+                    day = data['date'].day
+                    data['date'] = datetime(year, month, day)
+                except:
+                    pass  # If extraction fails for any reason, keep the original
             else:
                 # Last resort fallback - timezone-naive datetime
-                data['date'] = datetime.now()
+                now = datetime.now()
+                # Extract time part to time field if it's not already set
+                if data['time'] is None:
+                    data['time'] = now.time()
+                # Use only date part for date field
+                data['date'] = datetime(now.year, now.month, now.day)
             
             # Convert time to standard format if possible
             if data['time']:
-                try:
-                    # Try 12-hour format with AM/PM
-                    if 'AM' in data['time'] or 'PM' in data['time']:
-                        data['time'] = datetime.strptime(data['time'], '%I:%M %p').time()
-                    # Try 24-hour format
-                    else:
-                        data['time'] = datetime.strptime(data['time'], '%H:%M:%S').time()
-                except ValueError:
-                    # Keep as string if conversion fails
+                # Check if time is already a time object
+                if hasattr(data['time'], 'hour') and hasattr(data['time'], 'minute'):
+                    # Already a time object, no conversion needed
                     pass
+                elif isinstance(data['time'], str):
+                    try:
+                        # Try 12-hour format with AM/PM
+                        if 'AM' in data['time'] or 'PM' in data['time']:
+                            data['time'] = datetime.strptime(data['time'], '%I:%M %p').time()
+                        # Try 24-hour format
+                        else:
+                            data['time'] = datetime.strptime(data['time'], '%H:%M:%S').time()
+                    except ValueError:
+                        # Keep as string if conversion fails
+                        pass
             
             # Convert numeric values
             for field in ['total_kwh', 'peak_kw', 'cost_per_kwh', 'total_cost']:
