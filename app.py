@@ -105,7 +105,9 @@ with st.sidebar:
         
         # Search query options
         st.write("Search options:")
-        search_label = st.text_input("Email search term", "EV charging receipt")
+        default_search = "EV charging receipt OR Your Ampol AmpCharge tax invoice OR Your charging session receipt"
+        search_label = st.text_input("Email search term", default_search)
+        st.caption("You can use 'OR' to search for multiple terms. The default includes common EV charging receipt formats.")
         
         # Fetch data button
         if st.button("Fetch Charging Data"):
