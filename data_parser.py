@@ -1,9 +1,9 @@
 import re
+import csv
+import io
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-import io
-import csv
 
 def parse_charging_emails(emails):
     """

@@ -8,7 +8,7 @@ import urllib.parse
 
 from gmail_api import GmailClient
 from tesla_api import TeslaApiClient
-from data_parser import parse_charging_emails, clean_charging_data
+from data_parser import parse_charging_emails, parse_evcc_csv, clean_charging_data
 from data_visualizer import create_visualizations
 from utils import get_date_range, export_data_as_csv, save_credentials, load_credentials
 
