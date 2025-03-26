@@ -28,38 +28,9 @@ if 'authenticated' not in st.session_state:
 if 'gmail_client' not in st.session_state:
     st.session_state.gmail_client = GmailClient()
 
-# Function to get the base URL for the app
-def get_base_url():
-    # Simplified function to return a hardcoded URL that's easy for the user to add to Google Cloud Console
-    # This makes it easier to add to Google Cloud Console
-    return "https://workspace-stevelea1.replit.app"
-
 # App title and description
 st.title("⚡ EV Charging Data Analyzer")
 st.write("Extract and visualize your EV charging data from Gmail receipts")
-
-# Process OAuth callback
-query_params = st.query_params.to_dict()
-if "code" in query_params and "state" in query_params:
-    try:
-        # Get the redirect URI from session state if available
-        if 'redirect_uri' in st.session_state:
-            redirect_uri = st.session_state.redirect_uri
-        else:
-            # Default fallback to our app URL
-            redirect_uri = get_base_url()
-            
-        st.info(f"Using OAuth callback URL: {redirect_uri}")
-        
-        # Process OAuth response
-        if st.session_state.gmail_client.authorize_with_params(query_params, redirect_uri):
-            st.session_state.authenticated = True
-            st.success("Authentication successful!")
-            # Clear the URL parameters
-            st.query_params.clear()
-    except Exception as e:
-        st.error(f"Authentication error: {str(e)}")
-        st.session_state.authenticated = False
 
 # Sidebar for controls
 with st.sidebar:
@@ -71,31 +42,47 @@ with st.sidebar:
     if not st.session_state.authenticated:
         st.info("Please authenticate with your Gmail account to access your charging receipts.")
         
-        # Get app base URL for OAuth - now this is hardcoded
-        app_base_url = get_base_url()
-        st.info("IMPORTANT: Add this exact URL to your Google Cloud Console OAuth settings:")
-        st.code(app_base_url, language=None)
+        # Create two step authentication process
+        if 'auth_step' not in st.session_state:
+            st.session_state.auth_step = 1
+            
+        if st.session_state.auth_step == 1:
+            # First step: Get authorization URL
+            if st.button("Start Google Authentication"):
+                try:
+                    # Get the authorization URL (this uses the out-of-band flow)
+                    auth_url = st.session_state.gmail_client.get_authorization_url()
+                    st.session_state.auth_url = auth_url
+                    st.session_state.auth_step = 2
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Authentication error: {str(e)}")
         
-        # Use a hidden field to ensure the redirect URI is exactly what we need
-        redirect_uri = app_base_url
-        
-        st.warning("Please make sure you've added this exact URL to your Google Cloud Console as an authorized redirect URI before continuing.")
-        
-        # Authentication button
-        if st.button("Sign in with Google"):
-            try:
-                # Store the redirect URI in session state so it can be accessed in the callback
-                st.session_state.redirect_uri = redirect_uri
-                
-                auth_url = st.session_state.gmail_client.get_authorization_url(redirect_uri)
-                st.markdown(f"[Click here to authorize with Google]({auth_url})")
-                st.info("After authorization, you'll be redirected back to this app automatically.")
-            except Exception as e:
-                st.error(f"Authentication error: {str(e)}")
+        elif st.session_state.auth_step == 2:
+            # Second step: User enters the authorization code
+            st.info("1. Click the link below to authorize with Google:")
+            st.markdown(f"[Authorize with Google]({st.session_state.auth_url})")
+            
+            st.info("2. Google will display an authorization code. Copy that code and paste it below:")
+            auth_code = st.text_input("Authorization Code", key="auth_code")
+            
+            if st.button("Submit Authorization Code"):
+                if auth_code:
+                    try:
+                        # Use the code to get credentials
+                        if st.session_state.gmail_client.authorize_with_code(auth_code):
+                            st.session_state.authenticated = True
+                            st.success("Authentication successful!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Authentication error: {str(e)}")
+                else:
+                    st.error("Please enter the authorization code from Google")
     else:
         st.success("Authenticated with Gmail")
         if st.button("Logout"):
             st.session_state.authenticated = False
+            st.session_state.auth_step = 1
             st.session_state.gmail_client = GmailClient()  # Reset the client
             st.session_state.charging_data = None
             st.rerun()

@@ -36,51 +36,47 @@ class GmailClient:
         self.flow = None
         self.state = secrets.token_urlsafe(16)  # Generate a random state token
     
-    def get_authorization_url(self, redirect_uri):
-        """Get the authorization URL for the user to authenticate with Google"""
-        # Create flow instance using client config
+    def get_authorization_url(self):
+        """Get the authorization URL for the user to authenticate with Google using manual code entry"""
+        # Create flow instance using client config with out-of-band redirect
         self.flow = Flow.from_client_config(
             self.CLIENT_CONFIG,
             scopes=self.SCOPES,
-            redirect_uri=redirect_uri
+            redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # Use out-of-band flow (no redirect)
         )
         
         # Generate the auth URL
         auth_url, _ = self.flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
-            state=self.state,
             prompt='consent'
         )
         
         return auth_url
     
-    def authorize_with_params(self, params, redirect_uri):
-        """Process the authorization response and exchange code for credentials"""
-        # Verify state to prevent CSRF attacks
-        if params.get('state') != self.state:
-            raise ValueError("State mismatch. Possible CSRF attack.")
-        
-        # Get authorization code from URL parameters
-        code = params.get('code')
+    def authorize_with_code(self, code):
+        """Authorize using the code directly provided by the user"""
         if not code:
-            raise ValueError("No authorization code received")
+            raise ValueError("No authorization code provided")
         
-        # Reset flow with the same redirect_uri as used in authorization
-        self.flow = Flow.from_client_config(
-            self.CLIENT_CONFIG,
-            scopes=self.SCOPES,
-            redirect_uri=redirect_uri
-        )
-        
-        # Exchange the code for credentials
-        self.flow.fetch_token(code=code)
-        self.creds = self.flow.credentials
-        
-        # Initialize the Gmail API service
-        self.service = build('gmail', 'v1', credentials=self.creds)
-        
-        return True
+        try:
+            # Reset flow with out-of-band redirect
+            self.flow = Flow.from_client_config(
+                self.CLIENT_CONFIG,
+                scopes=self.SCOPES,
+                redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # Use out-of-band flow
+            )
+            
+            # Exchange the code for credentials
+            self.flow.fetch_token(code=code)
+            self.creds = self.flow.credentials
+            
+            # Initialize the Gmail API service
+            self.service = build('gmail', 'v1', credentials=self.creds)
+            
+            return True
+        except Exception as e:
+            raise ValueError(f"Failed to authorize with code: {str(e)}")
     
     def get_emails(self, query="", max_results=100):
         """Retrieve emails matching the query"""
