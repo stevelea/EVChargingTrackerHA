@@ -27,11 +27,14 @@ def create_visualizations(data):
             data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0)
     
     # Time series of charging sessions
+    # Convert size parameter to a list of values explicitly
+    peak_kw_values = data['peak_kw'].fillna(5).tolist()  # Use default size for missing values
+    
     figures['time_series'] = px.scatter(
         data,
         x='date',
         y='total_kwh',
-        size='peak_kw',
+        size=peak_kw_values,  # Pass as explicit list
         color='cost_per_kwh',
         hover_name='location',
         hover_data=['total_cost', 'peak_kw', 'duration'],
@@ -127,12 +130,15 @@ def create_visualizations(data):
     )
     
     # Cost per kWh over time
+    # Convert size parameter explicitly
+    total_kwh_values = data['total_kwh'].fillna(5).tolist()  # Use default size for missing values
+    
     figures['cost_per_kwh'] = px.scatter(
         data,
         x='date',
         y='cost_per_kwh',
         color='location',
-        size='total_kwh',
+        size=total_kwh_values,  # Pass as explicit list
         title='Cost per kWh Over Time',
         labels={
             'date': 'Date',
@@ -148,11 +154,14 @@ def create_visualizations(data):
     )
     
     # Charging duration analysis
+    # Convert size parameter to list
+    total_cost_values = data['total_cost'].fillna(5).tolist()  # Use default size for missing values
+    
     figures['charging_duration'] = px.scatter(
         data,
         x='total_kwh',
         y='peak_kw',
-        size='total_cost',
+        size=total_cost_values,  # Pass as explicit list
         color='cost_per_kwh',
         hover_name='location',
         hover_data=['date', 'duration'],
