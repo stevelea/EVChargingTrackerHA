@@ -26,15 +26,29 @@ def create_visualizations(data):
             # Handle NaN and None values by filling with 0
             data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0)
     
+    # Make sure date column is datetime
+    if 'date' in data.columns:
+        data['date'] = pd.to_datetime(data['date'], errors='coerce')
+    
+    # Pre-convert all series to lists for plotly
+    # This prevents the "narwhals.stable.v1.Series" error
+    plot_data = data.copy()
+    for column in plot_data.columns:
+        if not pd.api.types.is_datetime64_any_dtype(plot_data[column]):
+            try:
+                plot_data[column] = plot_data[column].tolist()
+            except:
+                pass  # Skip columns that can't be converted
+    
     # Time series of charging sessions
-    # Convert size parameter to a list of values explicitly
-    peak_kw_values = data['peak_kw'].fillna(5).tolist()  # Use default size for missing values
+    # Use default size for missing values with explicit list
+    peak_kw_values = data['peak_kw'].fillna(5).tolist()
     
     figures['time_series'] = px.scatter(
-        data,
+        plot_data,  # Use pre-converted data
         x='date',
         y='total_kwh',
-        size=peak_kw_values,  # Pass as explicit list
+        size=peak_kw_values,  # Pass as explicit list 
         color='cost_per_kwh',
         hover_name='location',
         hover_data=['total_cost', 'peak_kw', 'duration'],
@@ -110,13 +124,52 @@ def create_visualizations(data):
     )
     
     # Add monthly aggregate
-    monthly_data = data.copy()
-    monthly_data['month'] = monthly_data['date'].dt.to_period('M')
-    monthly_agg = monthly_data.groupby('month').agg({
-        'total_cost': 'sum',
-        'total_kwh': 'sum'
-    }).reset_index()
-    monthly_agg['month'] = monthly_agg['month'].dt.to_timestamp()
+    try:
+        # Make sure we've got proper datetime objects
+        monthly_data = data.copy()
+        # Ensure date column is datetime
+        if 'date' in monthly_data.columns:
+            try:
+                # Convert date to datetime if it's not already
+                if not pd.api.types.is_datetime64_any_dtype(monthly_data['date']):
+                    monthly_data['date'] = pd.to_datetime(monthly_data['date'], errors='coerce')
+                
+                # Extract month for aggregation without using dt accessor
+                monthly_data['month_year'] = monthly_data['date'].apply(
+                    lambda x: pd.Timestamp(year=x.year, month=x.month, day=1) if pd.notnull(x) else None
+                )
+                
+                # Group by the extracted month/year
+                monthly_agg = monthly_data.groupby('month_year').agg({
+                    'total_cost': 'sum',
+                    'total_kwh': 'sum'
+                }).reset_index()
+                
+                # Rename column for consistency
+                monthly_agg = monthly_agg.rename(columns={'month_year': 'month'})
+            except Exception as e:
+                # Fallback if date conversion fails
+                print(f"Error in monthly aggregation: {str(e)}")
+                monthly_agg = pd.DataFrame({
+                    'month': [data['date'].min()],  # Use min date as a fallback
+                    'total_cost': [data['total_cost'].sum()],
+                    'total_kwh': [data['total_kwh'].sum()]
+                })
+        else:
+            # Fallback if no date column
+            monthly_agg = pd.DataFrame({
+                'month': [pd.Timestamp.now()],
+                'total_cost': [data['total_cost'].sum()],
+                'total_kwh': [data['total_kwh'].sum()]
+            })
+    except Exception as e:
+        # Last-resort fallback
+        print(f"Monthly aggregation failed: {str(e)}")
+        monthly_agg = pd.DataFrame({
+            'month': [pd.Timestamp.now()],
+            'total_cost': [0],
+            'total_kwh': [0]
+        })
     
     figures['cost_time_series'].add_trace(
         go.Scatter(
@@ -134,7 +187,7 @@ def create_visualizations(data):
     total_kwh_values = data['total_kwh'].fillna(5).tolist()  # Use default size for missing values
     
     figures['cost_per_kwh'] = px.scatter(
-        data,
+        plot_data,  # Use pre-converted data
         x='date',
         y='cost_per_kwh',
         color='location',
@@ -158,7 +211,7 @@ def create_visualizations(data):
     total_cost_values = data['total_cost'].fillna(5).tolist()  # Use default size for missing values
     
     figures['charging_duration'] = px.scatter(
-        data,
+        plot_data,  # Use pre-converted data
         x='total_kwh',
         y='peak_kw',
         size=total_cost_values,  # Pass as explicit list

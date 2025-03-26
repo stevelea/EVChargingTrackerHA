@@ -114,19 +114,29 @@ def parse_charging_emails(emails):
                     '%d-%m-%Y', '%d-%m-%y', '%Y-%m-%d'
                 ]
                 
+                parsed_date = None
                 for fmt in date_formats:
                     try:
-                        data['date'] = datetime.strptime(data['date'], fmt).date()
+                        parsed_date = datetime.strptime(data['date'], fmt)
                         break
                     except ValueError:
                         continue
-                        
-                # If date parsing failed, fall back to email date
-                if not isinstance(data['date'], datetime.date) and email.get('date'):
-                    data['date'] = email['date'].date()
+                
+                if parsed_date:
+                    # Successfully parsed the date string
+                    data['date'] = parsed_date
+                elif email.get('date'):
+                    # Use email date as fallback
+                    data['date'] = email['date']
+                else:
+                    # Last resort fallback to today
+                    data['date'] = datetime.now()
             elif email.get('date'):
                 # Use email date as fallback
-                data['date'] = email['date'].date()
+                data['date'] = email['date']
+            else:
+                # Last resort fallback
+                data['date'] = datetime.now()
             
             # Convert time to standard format if possible
             if data['time']:
@@ -179,6 +189,12 @@ def clean_charging_data(charging_data):
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Ensure date column is datetime
+    if 'date' in df.columns:
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        # Fill missing dates with current date as fallback
+        df['date'] = df['date'].fillna(pd.Timestamp.now())
     
     # Fill missing values
     if 'peak_kw' in df.columns and 'total_kwh' in df.columns and 'duration' in df.columns:
