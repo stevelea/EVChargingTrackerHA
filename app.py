@@ -31,16 +31,14 @@ if 'gmail_client' not in st.session_state:
 # Function to get the base URL for the app
 def get_base_url():
     # Get the base URL for the Streamlit app
-    params = st.query_params.get_all("base_url")
+    replit_domain = os.environ.get("REPL_SLUG")
+    replit_owner = os.environ.get("REPL_OWNER")
     
-    # If base_url parameter exists, use it
-    if params:
-        return params[0]
+    if replit_domain and replit_owner:
+        return f"https://{replit_domain}.{replit_owner}.repl.co"
     
-    # When running on Replit, we should use the actual hostname from the request
-    # For now, we'll just use the Replit app URL format which is simply 'https://<REPL_ID>.replit.app'
-    # or fall back to localhost in development
-    return ""
+    # Fallback for development environments
+    return "http://localhost:5000"
 
 # App title and description
 st.title("⚡ EV Charging Data Analyzer")
@@ -54,8 +52,8 @@ if "code" in query_params and "state" in query_params:
         if 'redirect_uri' in st.session_state:
             redirect_uri = st.session_state.redirect_uri
         else:
-            # Default fallback
-            redirect_uri = "https://replit.com/auth/callback"
+            # Default fallback to our app URL
+            redirect_uri = get_base_url()
             
         st.info(f"Using OAuth callback URL: {redirect_uri}")
         
@@ -79,15 +77,16 @@ with st.sidebar:
     if not st.session_state.authenticated:
         st.info("Please authenticate with your Gmail account to access your charging receipts.")
         
-        # Allow user to specify the redirect URI that's approved in their Google Cloud Console
-        st.info("Please enter the exact redirect URI you've authorized in your Google Cloud Console:")
+        # Get app base URL for suggested redirect URI
+        app_base_url = get_base_url()
+        st.info("Use this exact URI in your Google Cloud Console OAuth settings:")
         redirect_uri = st.text_input(
             "Authorized redirect URI",
-            value="https://replit.com/auth/callback", 
-            help="This must exactly match what's in your Google Cloud Console OAuth settings"
+            value=app_base_url, 
+            help="Copy this URL to your Google Cloud Console's OAuth Credentials as an authorized redirect URI"
         )
         
-        st.info("Make sure this URI is added to your Google Cloud Console authorized redirect URIs")
+        st.info(f"Make sure to add '{app_base_url}' to your Google Cloud Console authorized redirect URIs")
         
         # Authentication button
         if st.button("Sign in with Google"):
