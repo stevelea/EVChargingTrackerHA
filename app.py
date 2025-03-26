@@ -180,19 +180,37 @@ if st.session_state.authenticated:
         st.header("Summary Statistics")
         col1, col2, col3, col4 = st.columns(4)
         
+        # Import the calculate_statistics function
+        from utils import calculate_statistics
+        
+        # Get statistics from the data
+        stats = calculate_statistics(data)
+        
         with col1:
-            st.metric("Total Sessions", len(data))
+            st.metric("Total Sessions", stats['total_sessions'])
         
         with col2:
-            total_kwh = data['total_kwh'].sum()
+            # Ensure total_kwh is a valid number
+            total_kwh = stats['total_kwh']
+            # Use a fallback value of 0 if the value is None or NaN
+            if pd.isna(total_kwh):
+                total_kwh = 0
             st.metric("Total kWh", f"{total_kwh:.2f}")
         
         with col3:
-            total_cost = data['total_cost'].sum()
+            # Ensure total_cost is a valid number
+            total_cost = stats['total_cost']
+            # Use a fallback value of 0 if the value is None or NaN
+            if pd.isna(total_cost):
+                total_cost = 0
             st.metric("Total Cost", f"${total_cost:.2f}")
         
         with col4:
-            avg_cost_per_kwh = total_cost / total_kwh if total_kwh > 0 else 0
+            # Ensure avg_cost_per_kwh is a valid number
+            avg_cost_per_kwh = stats['avg_cost_per_kwh']
+            # Use a fallback value of 0 if the value is None or NaN
+            if pd.isna(avg_cost_per_kwh):
+                avg_cost_per_kwh = 0
             st.metric("Avg. Cost per kWh", f"${avg_cost_per_kwh:.2f}")
         
         # Visualization tabs
