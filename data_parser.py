@@ -58,18 +58,35 @@ def parse_charging_emails(emails):
             r'Charging Time:\s*(.+?)(?:\n|\r|$)',
             r'Time Connected:\s*(.+?)(?:\n|\r|$)'
         ],
-        # Match cost per kWh
+        # Match cost per kWh with more flexible patterns
         'cost_per_kwh': [
-            r'Rate:\s*\$([\d.]+)/kWh',
-            r'Price per kWh:\s*\$([\d.]+)',
-            r'\$([\d.]+)\s*per kWh'
+            r'Rate:\s*\$?([\d.]+)/kWh',
+            r'Price per kWh:\s*\$?([\d.]+)',
+            r'\$?([\d.]+)\s*per kWh',
+            r'Rate:\s*\$?([\d.]+)\s*kWh',
+            r'@\s*\$?([\d.]+)/kWh',
+            r'Cost/kWh:\s*\$?([\d.]+)',
+            r'Price/kWh:\s*\$?([\d.]+)',
+            r'Unit Price:\s*\$?([\d.]+)',
+            r'@\s*\$?([\d.]+)',
+            r'at\s*\$?([\d.]+)/kWh'
         ],
-        # Match total cost
+        # Match total cost with more flexible patterns
         'total_cost': [
-            r'Total:\s*\$([\d.]+)',
-            r'Amount:\s*\$([\d.]+)',
-            r'Total Cost:\s*\$([\d.]+)',
-            r'Total Amount:\s*\$([\d.]+)'
+            r'Total:\s*\$?([\d.]+)',
+            r'Amount:\s*\$?([\d.]+)',
+            r'Total Cost:\s*\$?([\d.]+)',
+            r'Total Amount:\s*\$?([\d.]+)',
+            r'Cost:\s*\$?([\d.]+)',
+            r'Payment Amount:\s*\$?([\d.]+)',
+            r'Charged:\s*\$?([\d.]+)',
+            r'Bill Amount:\s*\$?([\d.]+)',
+            r'Total Charge:\s*\$?([\d.]+)',
+            r'Fee:\s*\$?([\d.]+)',
+            r'Amount Paid:\s*\$?([\d.]+)',
+            r'Total Payment:\s*\$?([\d.]+)',
+            r'Paid:\s*\$?([\d.]+)',
+            r'USD\s*([\d.]+)'
         ]
     }
     
@@ -268,12 +285,42 @@ def clean_charging_data(charging_data):
                 if total_hours > 0:
                     df.at[idx, 'peak_kw'] = row['total_kwh'] / total_hours
     
-    # Calculate missing cost values where possible
+    # Enhanced missing cost value calculation with more robust logic
     if 'total_kwh' in df.columns and 'cost_per_kwh' in df.columns and 'total_cost' in df.columns:
+        # Calculate missing total_cost values
         for idx, row in df.iterrows():
+            # If we have energy and rate but no cost, calculate it
             if pd.isna(row['total_cost']) and not pd.isna(row['total_kwh']) and not pd.isna(row['cost_per_kwh']):
                 df.at[idx, 'total_cost'] = row['total_kwh'] * row['cost_per_kwh']
+            
+            # If we have total cost and energy but no rate, calculate it
             elif pd.isna(row['cost_per_kwh']) and not pd.isna(row['total_kwh']) and not pd.isna(row['total_cost']) and row['total_kwh'] > 0:
                 df.at[idx, 'cost_per_kwh'] = row['total_cost'] / row['total_kwh']
+
+        # Some standard defaults if values are still missing
+        # Use the median cost per kWh as a fallback if available and total_kwh is known
+        median_cost_per_kwh = df['cost_per_kwh'].median()
+        if not pd.isna(median_cost_per_kwh):
+            for idx, row in df.iterrows():
+                if pd.isna(row['total_cost']) and not pd.isna(row['total_kwh']):
+                    df.at[idx, 'total_cost'] = row['total_kwh'] * median_cost_per_kwh
+                    # Also set the cost_per_kwh if it's missing
+                    if pd.isna(row['cost_per_kwh']):
+                        df.at[idx, 'cost_per_kwh'] = median_cost_per_kwh
+        
+        # If we have total_cost but not total_kwh and we know the median cost/kWh, we can infer total_kwh
+        median_total_kwh = df['total_kwh'].median()
+        if not pd.isna(median_cost_per_kwh) and not pd.isna(median_total_kwh):
+            for idx, row in df.iterrows():
+                if pd.isna(row['total_kwh']) and not pd.isna(row['total_cost']):
+                    df.at[idx, 'total_kwh'] = row['total_cost'] / median_cost_per_kwh
+                    # Also set the cost_per_kwh if it's missing
+                    if pd.isna(row['cost_per_kwh']):
+                        df.at[idx, 'cost_per_kwh'] = median_cost_per_kwh
+                        
+    # Replace any remaining NaN values in numeric columns with 0
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
     
     return df
