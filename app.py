@@ -32,18 +32,35 @@ st.set_page_config(
 
 # Initialize session state for data storage
 if 'charging_data' not in st.session_state:
-    # Try to load data from persistent storage
-    existing_data = load_charging_data()
-    if existing_data:
-        # Process the existing data
-        try:
-            df = clean_charging_data(existing_data)
-            st.session_state.charging_data = df
-        except Exception as e:
-            st.error(f"Error loading saved data: {str(e)}")
+    st.session_state.charging_data = None
+    st.session_state.current_user_email = None
+    
+    # We'll load data once the user is authenticated
+    # This keeps data separate for each user
+
+# Function to load user data
+def load_user_data(email_address=None):
+    """Load and process data for a specific user"""
+    if email_address:
+        # Store the current user's email
+        st.session_state.current_user_email = email_address
+        
+    # If we have a current user, load their data
+    if st.session_state.current_user_email:
+        existing_data = load_charging_data(st.session_state.current_user_email)
+        if existing_data:
+            # Process the existing data
+            try:
+                df = clean_charging_data(existing_data)
+                st.session_state.charging_data = df
+                return True
+            except Exception as e:
+                st.error(f"Error loading saved data: {str(e)}")
+                st.session_state.charging_data = None
+        else:
             st.session_state.charging_data = None
-    else:
-        st.session_state.charging_data = None
+    
+    return False
 
 if 'last_refresh' not in st.session_state:
     # If we loaded data, set last refresh to now
@@ -280,7 +297,7 @@ with st.sidebar:
             st.write("Data Management:")
             
             # Show currently stored data info
-            stored_data = load_charging_data()
+            stored_data = load_charging_data(st.session_state.current_user_email)
             if stored_data:
                 st.info(f"You have {len(stored_data)} charging sessions stored in the database.")
                 
@@ -344,7 +361,7 @@ with st.sidebar:
                     # Apply filters button
                     if st.button("Apply Filters"):
                         # Apply the filters
-                        st.session_state.records_to_display = filter_records_by_criteria(filter_criteria)
+                        st.session_state.records_to_display = filter_records_by_criteria(filter_criteria, st.session_state.current_user_email)
                         # Clear previous selections when filters change
                         st.session_state.selected_records_to_delete = []
                         st.success(f"Found {len(st.session_state.records_to_display)} records matching your criteria.")
@@ -425,13 +442,13 @@ with st.sidebar:
                             
                             # Confirm deletion
                             if st.button("Delete Selected Records", type="primary"):
-                                success, count = delete_selected_records(st.session_state.selected_records_to_delete)
+                                success, count = delete_selected_records(st.session_state.selected_records_to_delete, st.session_state.current_user_email)
                                 if success:
                                     st.success(f"Successfully deleted {count} records.")
                                     # Reset selections
                                     st.session_state.selected_records_to_delete = []
                                     # Reload data
-                                    stored_data = load_charging_data()
+                                    stored_data = load_charging_data(st.session_state.current_user_email)
                                     st.session_state.records_to_display = stored_data
                                     # Update main data
                                     if stored_data:
@@ -455,7 +472,7 @@ with st.sidebar:
                     if st.button("Clear All Stored Data", type="secondary"):
                         confirm = st.checkbox("I understand this will delete all my data", key="confirm_delete_all")
                         if confirm and st.button("Confirm Delete All Data", type="primary"):
-                            if delete_charging_data():
+                            if delete_charging_data(st.session_state.current_user_email):
                                 st.success("All stored charging data has been cleared.")
                                 st.session_state.charging_data = None
                                 st.rerun()
@@ -644,7 +661,7 @@ with st.sidebar:
                     # Check if incremental updates are enabled and if we have existing data
                     if 'incremental_update' in locals() and incremental_update:
                         # Load existing data
-                        existing_data = load_charging_data()
+                        existing_data = load_charging_data(st.session_state.current_user_email)
                         
                         if existing_data:
                             # Check if we're replacing EVCC data
@@ -670,11 +687,11 @@ with st.sidebar:
                             df = clean_charging_data(combined_data)
                             
                             # Save the updated data to persistent storage
-                            save_charging_data(combined_data)
+                            save_charging_data(combined_data, st.session_state.current_user_email)
                         else:
                             # No existing data, just process and save the new data
                             df = clean_charging_data(all_charging_data)
-                            save_charging_data(all_charging_data)
+                            save_charging_data(all_charging_data, st.session_state.current_user_email)
                             st.success(f"Saved {len(all_charging_data)} charging sessions to database.")
                     else:
                         # Clean and process the new data
@@ -682,7 +699,7 @@ with st.sidebar:
                         
                         # Save the new data to persistent storage 
                         # (will overwrite existing data when incremental_update is False)
-                        save_charging_data(all_charging_data)
+                        save_charging_data(all_charging_data, st.session_state.current_user_email)
                         st.success(f"Saved {len(all_charging_data)} charging sessions to database.")
                     
                     # Store processed data in session state
@@ -691,7 +708,7 @@ with st.sidebar:
                     st.success(f"Successfully processed data from {len(df)} total charging sessions.")
             else:
                 # Check if we have existing data to load instead
-                existing_data = load_charging_data()
+                existing_data = load_charging_data(st.session_state.current_user_email)
                 if existing_data:
                     with st.spinner("Loading stored data..."):
                         # Process the existing data
@@ -864,13 +881,13 @@ if st.session_state.authenticated:
                             # Process and store the data
                             if incremental_update and st.session_state.charging_data is not None:
                                 # Get existing data
-                                existing_data = load_charging_data()
+                                existing_data = load_charging_data(st.session_state.current_user_email)
                                 
                                 # Merge with new data
                                 combined_data = merge_charging_data(existing_data, email_charging_data)
                                 
                                 # Save the combined data
-                                save_charging_data(combined_data)
+                                save_charging_data(combined_data, st.session_state.current_user_email)
                                 
                                 # Process the data for display
                                 df = clean_charging_data(combined_data)
@@ -878,7 +895,7 @@ if st.session_state.authenticated:
                                 st.success(f"Successfully added {len(email_charging_data)} new charging sessions.")
                             else:
                                 # Save just the new data
-                                save_charging_data(email_charging_data)
+                                save_charging_data(email_charging_data, st.session_state.current_user_email)
                                 
                                 # Process the data for display
                                 df = clean_charging_data(email_charging_data)

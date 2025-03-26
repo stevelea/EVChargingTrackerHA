@@ -7,6 +7,26 @@ import hashlib
 
 # Define the file path for storing data
 DATA_DIR = "data"
+
+def get_user_data_file(email_address=None):
+    """
+    Get the data file path for a specific user, or the default path if no user is specified
+    
+    Args:
+        email_address: User's email address, or None for the default file
+        
+    Returns:
+        Path to the user-specific charging data file
+    """
+    if email_address:
+        # Create a safe filename from the email address
+        safe_email = email_address.replace("@", "_at_").replace(".", "_dot_")
+        return os.path.join(DATA_DIR, f"charging_data_{safe_email}.json")
+    else:
+        # Default file for backward compatibility
+        return os.path.join(DATA_DIR, "charging_data.json")
+
+# Default file path (for backward compatibility)
 CHARGING_DATA_FILE = os.path.join(DATA_DIR, "charging_data.json")
 
 def ensure_data_directory():
@@ -55,14 +75,18 @@ def generate_record_id(record):
     record_str = '|'.join(id_fields)
     return hashlib.md5(record_str.encode('utf-8')).hexdigest()
 
-def save_charging_data(data_list):
+def save_charging_data(data_list, email_address=None):
     """
     Save charging data to persistent storage
     
     Args:
         data_list: List of dictionaries containing charging data
+        email_address: Optional email address to save data for a specific user
     """
     ensure_data_directory()
+    
+    # Get the appropriate file path for this user
+    file_path = get_user_data_file(email_address)
     
     # Convert any datetime objects to strings
     serializable_data = []
@@ -98,23 +122,29 @@ def save_charging_data(data_list):
         serializable_data.append(record_copy)
     
     # Write to file using a custom JSON encoder for any remaining datetime objects
-    with open(CHARGING_DATA_FILE, 'w') as f:
+    with open(file_path, 'w') as f:
         json.dump(serializable_data, f, indent=2, default=str)
 
-def load_charging_data():
+def load_charging_data(email_address=None):
     """
     Load charging data from persistent storage
+    
+    Args:
+        email_address: Optional email address to load data for a specific user
     
     Returns:
         List of dictionaries containing charging data, or empty list if none found
     """
     ensure_data_directory()
     
-    if not os.path.exists(CHARGING_DATA_FILE):
+    # Get the appropriate file path for this user
+    file_path = get_user_data_file(email_address)
+    
+    if not os.path.exists(file_path):
         return []
     
     try:
-        with open(CHARGING_DATA_FILE, 'r') as f:
+        with open(file_path, 'r') as f:
             data = json.load(f)
             
         # Convert string dates back to datetime objects
@@ -304,35 +334,45 @@ def filter_data_by_date_range(data, start_date, end_date):
         
         return filtered_data
 
-def delete_charging_data():
+def delete_charging_data(email_address=None):
     """
-    Delete all stored charging data
+    Delete all stored charging data for a specific user or the default data
+    
+    Args:
+        email_address: Optional email address to delete data for a specific user
     """
     ensure_data_directory()
     
-    if os.path.exists(CHARGING_DATA_FILE):
-        os.remove(CHARGING_DATA_FILE)
+    # Get the appropriate file path for this user
+    file_path = get_user_data_file(email_address)
+    
+    if os.path.exists(file_path):
+        os.remove(file_path)
         return True
     return False
 
-def delete_selected_records(record_ids):
+def delete_selected_records(record_ids, email_address=None):
     """
     Delete selected records by their IDs
     
     Args:
         record_ids: List of record IDs to delete
+        email_address: Optional email address to delete data for a specific user
         
     Returns:
         Tuple of (success, count) indicating if operation succeeded and how many records were deleted
     """
     ensure_data_directory()
     
-    if not os.path.exists(CHARGING_DATA_FILE):
+    # Get the appropriate file path for this user
+    file_path = get_user_data_file(email_address)
+    
+    if not os.path.exists(file_path):
         return False, 0
     
     try:
         # Load existing data
-        existing_data = load_charging_data()
+        existing_data = load_charging_data(email_address)
         
         # Create a set of IDs to delete for faster lookup
         ids_to_delete = set(record_ids)
@@ -344,24 +384,25 @@ def delete_selected_records(record_ids):
         records_deleted = len(existing_data) - len(new_data)
         
         # Save the updated data
-        save_charging_data(new_data)
+        save_charging_data(new_data, email_address)
         
         return True, records_deleted
     except Exception as e:
         st.error(f"Error deleting selected records: {str(e)}")
         return False, 0
 
-def filter_records_by_criteria(criteria):
+def filter_records_by_criteria(criteria, email_address=None):
     """
     Filter records by multiple criteria
     
     Args:
         criteria: Dictionary of field-value pairs to filter on
+        email_address: Optional email address to filter data for a specific user
         
     Returns:
         List of records matching all criteria
     """
-    data = load_charging_data()
+    data = load_charging_data(email_address)
     
     if not data:
         return []
