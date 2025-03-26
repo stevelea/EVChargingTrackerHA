@@ -635,6 +635,97 @@ with st.sidebar:
 
 # Main content area
 if st.session_state.authenticated:
+    # Auto-fetch data when the user first logs in
+    if 'auto_fetch_data' in st.session_state and st.session_state.auto_fetch_data:
+        st.info("Automatically fetching your charging data...")
+        
+        # Set up default search parameters
+        days_back = 90
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days_back)
+        search_query = "EV charging receipt OR Ampol AmpCharge OR charging session"
+        incremental_update = True
+        
+        # Execute data fetch
+        with st.spinner("Fetching email data..."):
+            try:
+                # Get emails
+                gmail_client = st.session_state.gmail_client
+                emails = gmail_client.get_emails(query=search_query)
+                
+                # Apply date filtering in Python rather than in IMAP
+                if emails:
+                    # Filter emails by date
+                    filtered_emails = []
+                    for email in emails:
+                        if email['date']:
+                            # Make naive datetime for comparison (remove timezone info)
+                            email_date = email['date'].replace(tzinfo=None)
+                            if start_date <= email_date <= end_date:
+                                filtered_emails.append(email)
+                    
+                    emails_count = len(filtered_emails)
+                    
+                    # Parse emails to extract charging data
+                    with st.spinner("Parsing email data..."):
+                        email_charging_data = parse_charging_emails(filtered_emails)
+                        
+                        if email_charging_data:
+                            # Process and store the data
+                            if incremental_update and st.session_state.charging_data is not None:
+                                # Get existing data
+                                existing_data = load_charging_data()
+                                
+                                # Merge with new data
+                                combined_data = merge_charging_data(existing_data, email_charging_data)
+                                
+                                # Save the combined data
+                                save_charging_data(combined_data)
+                                
+                                # Process the data for display
+                                df = clean_charging_data(combined_data)
+                                st.session_state.charging_data = df
+                                st.success(f"Successfully added {len(email_charging_data)} new charging sessions.")
+                            else:
+                                # Save just the new data
+                                save_charging_data(email_charging_data)
+                                
+                                # Process the data for display
+                                df = clean_charging_data(email_charging_data)
+                                st.session_state.charging_data = df
+                                st.success(f"Successfully loaded {len(email_charging_data)} charging sessions.")
+                
+                # Make sure to properly close the IMAP connection when done
+                try:
+                    gmail_client.close()
+                except:
+                    pass
+                    
+            except Exception as e:
+                # On error, still try to close the connection
+                try:
+                    if 'gmail_client' in locals():
+                        gmail_client.close()
+                except:
+                    pass
+                    
+                # Show error message
+                error_message = str(e)
+                if "LOGOUT" in error_message:
+                    st.error("Connection error with Gmail. Try again later.")
+                else:
+                    st.error(f"Error fetching email data: {error_message}")
+        
+        # Reset the auto fetch flag
+        st.session_state.auto_fetch_data = False
+        
+        # Update last refresh timestamp
+        st.session_state.last_refresh = datetime.now()
+        
+        # Force page refresh to display data
+        st.rerun()
+            
+    # Display data if available
     if st.session_state.charging_data is not None:
         data = st.session_state.charging_data
         
