@@ -36,40 +36,83 @@ class GmailClient:
         self.flow = None
         self.state = secrets.token_urlsafe(16)  # Generate a random state token
     
-    def get_authorization_url(self):
-        """Get the authorization URL for the user to authenticate with Google"""
-        # Create flow instance using client config with localhost redirect
-        self.flow = Flow.from_client_config(
-            self.CLIENT_CONFIG,
-            scopes=self.SCOPES,
-            redirect_uri='https://localhost'  # This doesn't need to be a real page, just a valid URL format
-        )
+    def get_authorization_instructions(self):
+        """
+        Returns instructions for manual authorization without 
+        using OAuth redirects or specific redirect URIs.
+        """
+        # Just return the OAuth consent screen URL - the user will need to manually copy the code
+        return """
+        1. Go to your Google Cloud Console: https://console.cloud.google.com/apis/credentials
+        2. Find your OAuth 2.0 Client ID used for this app
+        3. Go to the "OAuth consent screen" tab
+        4. Click "PUBLISH APP" if not already published
+        5. Go to https://accounts.google.com/o/oauth2/v2/auth?
+           client_id={client_id}
+           &redirect_uri=https://developers.google.com/oauthplayground
+           &scope=https://www.googleapis.com/auth/gmail.readonly
+           &access_type=offline
+           &response_type=code
         
-        # Generate the auth URL
-        auth_url, _ = self.flow.authorization_url(
-            access_type='offline',
-            include_granted_scopes='true',
-            prompt='consent'
-        )
-        
-        return auth_url
+        Copy and paste this complete URL in your browser. After authenticating, you'll get 
+        an authorization code that you can paste back in the app.
+        """.format(
+            client_id=self.CLIENT_CONFIG['web']['client_id']
+        ).replace('\n           ', '')
     
     def authorize_with_code(self, code):
-        """Authorize using the auth code provided by the user"""
+        """
+        Authorize using the auth code provided by the user through the manual process
+        """
         if not code:
             raise ValueError("No authorization code provided")
         
         try:
-            # Reset flow with same redirect URI
-            self.flow = Flow.from_client_config(
-                self.CLIENT_CONFIG,
+            # Create credentials manually using the authorization code
+            client_id = self.CLIENT_CONFIG['web']['client_id']
+            client_secret = self.CLIENT_CONFIG['web']['client_secret']
+            
+            # Create credentials object directly
+            from google.oauth2.credentials import Credentials
+            
+            self.creds = Credentials(
+                None,  # No token yet
+                refresh_token=None,  # Will be filled with the response
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=client_id,
+                client_secret=client_secret,
                 scopes=self.SCOPES,
-                redirect_uri='https://localhost'  # Must match the one used in get_authorization_url
             )
             
-            # Exchange the code for credentials
-            self.flow.fetch_token(code=code)
-            self.creds = self.flow.credentials
+            # Manual token exchange
+            import requests
+            
+            response = requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "code": code,
+                    "redirect_uri": "https://developers.google.com/oauthplayground",
+                    "grant_type": "authorization_code",
+                }
+            )
+            
+            if response.status_code != 200:
+                raise ValueError(f"Token exchange failed: {response.text}")
+                
+            token_data = response.json()
+            
+            # Update the credentials with the received tokens
+            self.creds = Credentials(
+                token_data.get('access_token'),
+                refresh_token=token_data.get('refresh_token'),
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=client_id,
+                client_secret=client_secret,
+                scopes=self.SCOPES,
+                expiry=None  # We don't parse the expiry for simplicity
+            )
             
             # Initialize the Gmail API service
             self.service = build('gmail', 'v1', credentials=self.creds)

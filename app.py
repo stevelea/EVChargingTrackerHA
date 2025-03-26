@@ -47,55 +47,39 @@ with st.sidebar:
             st.session_state.auth_step = 1
             
         if st.session_state.auth_step == 1:
-            # First step: Get authorization URL
+            # First step: Provide instructions for Google authentication
             if st.button("Start Google Authentication"):
                 try:
-                    # Get the authorization URL (this uses the out-of-band flow)
-                    auth_url = st.session_state.gmail_client.get_authorization_url()
-                    st.session_state.auth_url = auth_url
+                    # Get authentication instructions
+                    instructions = st.session_state.gmail_client.get_authorization_instructions()
+                    st.session_state.auth_instructions = instructions
                     st.session_state.auth_step = 2
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Authentication error: {str(e)}")
+                    st.error(f"Error generating authentication instructions: {str(e)}")
         
         elif st.session_state.auth_step == 2:
-            # Second step: User enters the authorization code
-            st.info("1. Click the link below to authorize with Google:")
-            st.markdown(f"[Authorize with Google]({st.session_state.auth_url})")
+            # Second step: User follows manual instructions and enters the authorization code
+            st.info("Follow these steps to manually authenticate with Google:")
             
-            st.info("""2. After you authorize the app, you'll be redirected to a page that says:
+            # Display the instructions provided by the Gmail client
+            st.code(st.session_state.auth_instructions, language=None)
             
-            "This site can't be reached" or "localhost refused to connect"
+            # Provide a field for the user to enter the authorization code
+            auth_code = st.text_input("Enter the authorization code you received:", key="auth_code")
             
-            3. That's normal! Look at your address bar - it contains the authorization code:
-            
-            https://localhost/?state=xyz...&code=4/0Adeu...&scope=email+https...
-            
-            4. Copy the ENTIRE URL from your address bar after being redirected.""")
-            
-            auth_url = st.text_input("Paste the FULL redirect URL here:", key="auth_url_redirect")
-            
-            if st.button("Submit"):
-                if auth_url:
+            if st.button("Submit Authorization Code"):
+                if auth_code:
                     try:
-                        # Extract code from URL
-                        import urllib.parse
-                        parsed_url = urllib.parse.urlparse(auth_url)
-                        query_params = urllib.parse.parse_qs(parsed_url.query)
-                        
-                        if 'code' in query_params:
-                            auth_code = query_params['code'][0]
-                            # Use the code to get credentials
-                            if st.session_state.gmail_client.authorize_with_code(auth_code):
-                                st.session_state.authenticated = True
-                                st.success("Authentication successful!")
-                                st.rerun()
-                        else:
-                            st.error("No authorization code found in the URL. Please copy the complete URL after being redirected.")
+                        # Use the code to get credentials
+                        if st.session_state.gmail_client.authorize_with_code(auth_code):
+                            st.session_state.authenticated = True
+                            st.success("Authentication successful!")
+                            st.rerun()
                     except Exception as e:
                         st.error(f"Authentication error: {str(e)}")
                 else:
-                    st.error("Please enter the complete redirect URL from your browser's address bar")
+                    st.error("Please enter the authorization code you received from Google")
     else:
         st.success("Authenticated with Gmail")
         if st.button("Logout"):
