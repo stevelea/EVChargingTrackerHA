@@ -50,8 +50,13 @@ st.write("Extract and visualize your EV charging data from Gmail receipts")
 query_params = st.query_params.to_dict()
 if "code" in query_params and "state" in query_params:
     try:
-        # Use the fixed redirect URI
-        redirect_uri = "https://replit.com/auth/callback"
+        # Get the redirect URI from session state if available
+        if 'redirect_uri' in st.session_state:
+            redirect_uri = st.session_state.redirect_uri
+        else:
+            # Default fallback
+            redirect_uri = "https://replit.com/auth/callback"
+            
         st.info(f"Using OAuth callback URL: {redirect_uri}")
         
         # Process OAuth response
@@ -74,15 +79,22 @@ with st.sidebar:
     if not st.session_state.authenticated:
         st.info("Please authenticate with your Gmail account to access your charging receipts.")
         
-        # Use a fixed redirect URI that's approved in Google Cloud Console
-        redirect_uri = "https://replit.com/auth/callback"
+        # Allow user to specify the redirect URI that's approved in their Google Cloud Console
+        st.info("Please enter the exact redirect URI you've authorized in your Google Cloud Console:")
+        redirect_uri = st.text_input(
+            "Authorized redirect URI",
+            value="https://replit.com/auth/callback", 
+            help="This must exactly match what's in your Google Cloud Console OAuth settings"
+        )
         
-        st.info("Using Replit's standard OAuth callback URL. Please make sure you've added this URL to your Google Cloud Console authorized redirect URIs:")
-        st.code(redirect_uri)
+        st.info("Make sure this URI is added to your Google Cloud Console authorized redirect URIs")
         
         # Authentication button
         if st.button("Sign in with Google"):
             try:
+                # Store the redirect URI in session state so it can be accessed in the callback
+                st.session_state.redirect_uri = redirect_uri
+                
                 auth_url = st.session_state.gmail_client.get_authorization_url(redirect_uri)
                 st.markdown(f"[Click here to authorize with Google]({auth_url})")
                 st.info("After authorization, you'll be redirected back to this app automatically.")
