@@ -1,202 +1,175 @@
 import os
-import base64
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
+import imaplib
 import email
-from email.utils import parsedate_to_datetime
+import base64
 import streamlit as st
-import tempfile
-import json
-import secrets
-import urllib.parse
+from email.utils import parsedate_to_datetime
+from datetime import datetime, timedelta
 
 class GmailClient:
-    """Class to handle Gmail API authentication and email retrieval"""
-    
-    # Get Google OAuth client credentials from environment variables
-    @property
-    def CLIENT_CONFIG(self):
-        return {
-            "web": {
-                "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
-                "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                # The redirect_uris will be passed dynamically when creating the Flow
-                "redirect_uris": []
-            }
-        }
+    """Class to handle Gmail authentication and email retrieval using IMAP"""
     
     def __init__(self):
-        self.SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
-        self.creds = None
-        self.service = None
-        self.flow = None
-        self.state = secrets.token_urlsafe(16)  # Generate a random state token
-    
-    def get_authorization_instructions(self):
+        self.imap = None
+        self.email_address = None
+        self.app_password = None
+        
+    def get_auth_instructions(self):
         """
-        Returns instructions for manual authorization using the Google OAuth Playground.
+        Returns instructions for setting up an App Password for Gmail
         """
-        client_id = self.CLIENT_CONFIG['web']['client_id']
-        client_secret = self.CLIENT_CONFIG['web']['client_secret']
+        return """
+        To access your Gmail account safely, you'll need to create an App Password:
         
-        return f"""
-        1. Go to Google's OAuth 2.0 Playground: https://developers.google.com/oauthplayground/
+        1. Go to your Google Account settings: https://myaccount.google.com/
         
-        2. Click the gear icon ⚙️ in the top-right corner
+        2. Select "Security" from the left menu
         
-        3. Check "Use your own OAuth credentials"
+        3. Under "Signing in to Google," select "2-Step Verification" and verify your identity
         
-        4. Enter these credentials:
-           - OAuth Client ID: {client_id}
-           - OAuth Client Secret: {client_secret}
+        4. At the bottom of the page, select "App passwords"
         
-        5. Close the settings panel
+        5. Click "Select app" and choose "Mail"
         
-        6. In the left panel under "Step 1", find "Gmail API v1" and select:
-           - https://www.googleapis.com/auth/gmail.readonly
+        6. Click "Select device" and choose "Other"
         
-        7. Click "Authorize APIs" and proceed with Google authentication
+        7. Enter "EV Charging Analyzer" and click "Generate"
         
-        8. On the "Step 2" screen, click "Exchange authorization code for tokens"
+        8. Google will display a 16-character app password
         
-        9. In "Step 3", look for "access_token" in the response
-        
-        10. Copy the entire access token (the long string after "access_token":) 
-            and paste it back in the app
+        9. Copy this password and paste it in the app password field below
+           (Don't worry, this password only gives access to your Gmail and nothing else)
         """
     
-    def authorize_with_code(self, code):
+    def authenticate(self, email_address, app_password):
         """
-        Authorize using the auth code provided by the user through the manual process
+        Authenticate with Gmail using IMAP with an app password
         """
-        if not code:
-            raise ValueError("No authorization code provided")
+        if not email_address or not app_password:
+            raise ValueError("Email address and app password are required")
         
         try:
-            # Create credentials manually using the authorization code
-            client_id = self.CLIENT_CONFIG['web']['client_id']
-            client_secret = self.CLIENT_CONFIG['web']['client_secret']
+            # Connect to Gmail IMAP server
+            self.imap = imaplib.IMAP4_SSL("imap.gmail.com")
             
-            # Create credentials object directly
-            from google.oauth2.credentials import Credentials
+            # Login with credentials
+            self.imap.login(email_address, app_password)
             
-            self.creds = Credentials(
-                None,  # No token yet
-                refresh_token=None,  # Will be filled with the response
-                token_uri="https://oauth2.googleapis.com/token",
-                client_id=client_id,
-                client_secret=client_secret,
-                scopes=self.SCOPES,
-            )
-            
-            # Manual token exchange
-            import requests
-            
-            response = requests.post(
-                "https://oauth2.googleapis.com/token",
-                data={
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "code": code,
-                    "redirect_uri": "https://developers.google.com/oauthplayground",
-                    "grant_type": "authorization_code",
-                }
-            )
-            
-            if response.status_code != 200:
-                raise ValueError(f"Token exchange failed: {response.text}")
-                
-            token_data = response.json()
-            
-            # Update the credentials with the received tokens
-            self.creds = Credentials(
-                token_data.get('access_token'),
-                refresh_token=token_data.get('refresh_token'),
-                token_uri="https://oauth2.googleapis.com/token",
-                client_id=client_id,
-                client_secret=client_secret,
-                scopes=self.SCOPES,
-                expiry=None  # We don't parse the expiry for simplicity
-            )
-            
-            # Initialize the Gmail API service
-            self.service = build('gmail', 'v1', credentials=self.creds)
+            # Store credentials for later use
+            self.email_address = email_address
+            self.app_password = app_password
             
             return True
         except Exception as e:
-            raise ValueError(f"Failed to authorize with code: {str(e)}")
+            raise ValueError(f"Authentication failed: {str(e)}")
     
     def get_emails(self, query="", max_results=100):
-        """Retrieve emails matching the query"""
-        if not self.service:
-            raise ValueError("Gmail service not initialized. Please authenticate first.")
+        """
+        Retrieve emails matching search criteria using IMAP
+        """
+        if not self.imap:
+            raise ValueError("Not authenticated. Please authenticate first.")
         
         try:
-            # Search for messages matching the query
-            results = self.service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=max_results
-            ).execute()
+            # Select the mailbox
+            self.imap.select('INBOX')
             
-            messages = results.get('messages', [])
+            # Prepare search criteria with proper escaping
+            query = query.replace('"', '\\"')  # Escape double quotes
             
-            if not messages:
-                return []
+            # Try searching by subject first
+            search_criteria = f'SUBJECT "{query}"' if query else 'ALL'
             
-            # Get full email content for each message ID
+            # Search for messages
+            status, message_ids = self.imap.search(None, search_criteria)
+            
+            # If no results, try a broader search in the body
+            if status == 'OK' and not message_ids[0]:
+                search_criteria = f'TEXT "{query}"'
+                status, message_ids = self.imap.search(None, search_criteria)
+            
+            if status != 'OK':
+                raise ValueError(f"Error searching for emails: {status}")
+            
+            # Convert space-separated string of message IDs to a list
+            message_id_list = message_ids[0].split()
+            
+            # Limit the number of messages to retrieve
+            message_id_list = message_id_list[:max_results]
+            
             emails = []
-            for message in messages:
-                msg = self.service.users().messages().get(
-                    userId='me', 
-                    id=message['id'],
-                    format='full'
-                ).execute()
+            for msg_id in message_id_list:
+                # Fetch the email
+                status, msg_data = self.imap.fetch(msg_id, '(RFC822)')
                 
-                # Process email data
+                if status != 'OK':
+                    st.warning(f"Error fetching email {msg_id}: {status}")
+                    continue
+                
+                # Parse the email
+                raw_email = msg_data[0][1]
+                msg = email.message_from_bytes(raw_email)
+                
+                # Process the email
                 email_data = self._process_email(msg)
                 if email_data:
                     emails.append(email_data)
             
             return emails
-            
-        except Exception as error:
-            st.error(f"An error occurred: {error}")
+        
+        except Exception as e:
+            st.error(f"Error fetching emails: {str(e)}")
             return []
     
     def _process_email(self, msg):
-        """Extract relevant information from an email message"""
+        """
+        Extract relevant information from an email message
+        """
         try:
             # Get headers
-            headers = msg['payload']['headers']
-            subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
-            from_email = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
-            date_str = next((h['value'] for h in headers if h['name'].lower() == 'date'), None)
+            subject = msg.get('Subject', 'No Subject')
+            from_email = msg.get('From', 'Unknown Sender')
+            date_str = msg.get('Date')
             
             # Parse date
-            try:
-                date = parsedate_to_datetime(date_str) if date_str else None
-            except:
-                date = None
+            date = None
+            if date_str:
+                try:
+                    date = parsedate_to_datetime(date_str)
+                except:
+                    date = None
             
             # Get email body
             body = ""
-            if 'parts' in msg['payload']:
-                for part in msg['payload']['parts']:
-                    if part['mimeType'] == 'text/plain':
-                        body = base64.urlsafe_b64decode(part['body']['data'].encode('ASCII')).decode('utf-8')
+            if msg.is_multipart():
+                for part in msg.walk():
+                    content_type = part.get_content_type()
+                    content_disposition = str(part.get("Content-Disposition"))
+                    
+                    # Skip attachments
+                    if "attachment" in content_disposition:
+                        continue
+                    
+                    # Get text parts
+                    if content_type == "text/plain":
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            charset = part.get_content_charset() or 'utf-8'
+                            body = payload.decode(charset, errors='replace')
                         break
-            elif 'body' in msg['payload'] and 'data' in msg['payload']['body']:
-                body = base64.urlsafe_b64decode(msg['payload']['body']['data'].encode('ASCII')).decode('utf-8')
+            else:
+                payload = msg.get_payload(decode=True)
+                if payload:
+                    charset = msg.get_content_charset() or 'utf-8'
+                    body = payload.decode(charset, errors='replace')
+            
+            # Generate unique ID if actual ID is not available
+            msg_id = msg.get('Message-ID', f"generated-{hash(subject + from_email + str(date))}")
             
             # Return the processed email data
             return {
-                'id': msg['id'],
-                'thread_id': msg['threadId'],
+                'id': msg_id,
+                'thread_id': msg_id,  # Use same ID for simplicity
                 'subject': subject,
                 'from': from_email,
                 'date': date,
@@ -206,3 +179,12 @@ class GmailClient:
         except Exception as e:
             st.warning(f"Error processing email: {str(e)}")
             return None
+    
+    def close(self):
+        """Close the IMAP connection"""
+        if self.imap:
+            try:
+                self.imap.close()
+                self.imap.logout()
+            except:
+                pass  # Ignore errors on close

@@ -5,18 +5,23 @@ import re
 
 def get_date_range(start_date, end_date):
     """
-    Format a date range for Gmail API query
+    Format a date range for Gmail search
+    This function now supports both Gmail API and IMAP search formats
     
     Args:
         start_date: Start date as datetime object
         end_date: End date as datetime object
         
     Returns:
-        Gmail query string for date range
+        Search query string for date range
     """
+    # IMAP and Gmail API use slightly different formats,
+    # but both understand this format
     start_str = start_date.strftime('%Y/%m/%d')
     end_str = end_date.strftime('%Y/%m/%d')
-    return f"after:{start_str} before:{end_str}"
+    
+    # Format that works for both IMAP and Gmail API
+    return f"SINCE {start_str} BEFORE {end_str}"
 
 def format_duration(seconds):
     """

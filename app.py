@@ -47,11 +47,11 @@ with st.sidebar:
             st.session_state.auth_step = 1
             
         if st.session_state.auth_step == 1:
-            # First step: Provide instructions for Google authentication
-            if st.button("Start Google Authentication"):
+            # First step: Provide instructions for Google app password
+            if st.button("Start Gmail Authentication"):
                 try:
                     # Get authentication instructions
-                    instructions = st.session_state.gmail_client.get_authorization_instructions()
+                    instructions = st.session_state.gmail_client.get_auth_instructions()
                     st.session_state.auth_instructions = instructions
                     st.session_state.auth_step = 2
                     st.rerun()
@@ -59,48 +59,28 @@ with st.sidebar:
                     st.error(f"Error generating authentication instructions: {str(e)}")
         
         elif st.session_state.auth_step == 2:
-            # Second step: User follows manual instructions and enters the authorization code
-            st.info("Follow these steps to manually authenticate with Google:")
+            # Second step: User follows instructions to create an app password
+            st.info("Follow these steps to securely access your Gmail account:")
             
             # Display the instructions provided by the Gmail client
             st.code(st.session_state.auth_instructions, language=None)
             
-            # Provide a field for the user to enter the access token directly
-            access_token = st.text_input("Enter the access_token from Step 3:", key="access_token")
+            # Provide fields for the user to enter their email and app password
+            email_address = st.text_input("Enter your Gmail address:", key="email_address")
+            app_password = st.text_input("Enter the App Password:", key="app_password", type="password")
             
-            if st.button("Submit Access Token"):
-                if access_token:
+            if st.button("Connect to Gmail"):
+                if email_address and app_password:
                     try:
-                        # Create credentials directly with the access token
-                        from google.oauth2.credentials import Credentials
-                        
-                        # Get client details
-                        client_id = st.session_state.gmail_client.CLIENT_CONFIG['web']['client_id']
-                        client_secret = st.session_state.gmail_client.CLIENT_CONFIG['web']['client_secret']
-                        
-                        # Create credentials
-                        credentials = Credentials(
-                            access_token,
-                            client_id=client_id,
-                            client_secret=client_secret,
-                            token_uri="https://oauth2.googleapis.com/token",
-                            scopes=['https://www.googleapis.com/auth/gmail.readonly']
-                        )
-                        
-                        # Set credentials and build service
-                        st.session_state.gmail_client.creds = credentials
-                        
-                        # Initialize the Gmail API service
-                        from googleapiclient.discovery import build
-                        st.session_state.gmail_client.service = build('gmail', 'v1', credentials=credentials)
-                        
-                        st.session_state.authenticated = True
-                        st.success("Authentication successful!")
-                        st.rerun()
+                        # Authenticate with the provided credentials
+                        if st.session_state.gmail_client.authenticate(email_address, app_password):
+                            st.session_state.authenticated = True
+                            st.success("Authentication successful!")
+                            st.rerun()
                     except Exception as e:
                         st.error(f"Authentication error: {str(e)}")
                 else:
-                    st.error("Please enter the access token from the OAuth Playground")
+                    st.error("Please enter both your Gmail address and the App Password")
     else:
         st.success("Authenticated with Gmail")
         if st.button("Logout"):
@@ -131,21 +111,27 @@ with st.sidebar:
         if st.button("Fetch Charging Data"):
             with st.spinner("Fetching emails..."):
                 try:
-                    # Get the date range in Gmail query format
-                    date_range = get_date_range(start_date, end_date)
-                    
+                    # Use just search term for now (IMAP search is more limited with complex queries)
                     # Get emails
                     gmail_client = st.session_state.gmail_client
                     emails = gmail_client.get_emails(
-                        query=f"{search_label} {date_range}"
+                        query=search_label
                     )
                     
+                    # Apply date filtering in Python rather than in IMAP
                     if emails:
-                        st.info(f"Found {len(emails)} emails matching your criteria.")
+                        # Filter emails by date
+                        filtered_emails = []
+                        for email in emails:
+                            if email['date'] and start_date <= email['date'] <= end_date:
+                                filtered_emails.append(email)
+                        
+                        emails_count = len(filtered_emails)
+                        st.info(f"Found {emails_count} emails matching your criteria.")
                         
                         # Parse emails to extract charging data
                         with st.spinner("Parsing email data..."):
-                            charging_data = parse_charging_emails(emails)
+                            charging_data = parse_charging_emails(filtered_emails)
                             
                             if charging_data:
                                 # Store data in session state
@@ -156,6 +142,9 @@ with st.sidebar:
                                 st.warning("No charging data could be extracted from the emails.")
                     else:
                         st.warning("No emails found matching your search criteria.")
+                    
+                    # Close the IMAP connection when done
+                    gmail_client.close()
                         
                 except Exception as e:
                     st.error(f"Error fetching data: {str(e)}")
