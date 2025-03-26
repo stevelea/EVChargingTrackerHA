@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import urllib.parse
 
 from gmail_api import GmailClient
-from data_parser import parse_charging_emails
+from data_parser import parse_charging_emails, clean_charging_data
 from data_visualizer import create_visualizations
 from utils import get_date_range, export_data_as_csv
 
@@ -137,8 +137,11 @@ with st.sidebar:
                             charging_data = parse_charging_emails(filtered_emails)
                             
                             if charging_data:
+                                # Clean and process the charging data
+                                df = clean_charging_data(charging_data)
+                                
                                 # Store data in session state
-                                st.session_state.charging_data = pd.DataFrame(charging_data)
+                                st.session_state.charging_data = df
                                 st.session_state.last_refresh = datetime.now()
                                 st.success(f"Successfully extracted data from {len(charging_data)} charging sessions.")
                             else:

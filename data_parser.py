@@ -174,6 +174,12 @@ def clean_charging_data(charging_data):
     # Convert to DataFrame
     df = pd.DataFrame(charging_data)
     
+    # Ensure all numeric columns are correctly converted to float
+    numeric_cols = ['total_kwh', 'peak_kw', 'cost_per_kwh', 'total_cost']
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
     # Fill missing values
     if 'peak_kw' in df.columns and 'total_kwh' in df.columns and 'duration' in df.columns:
         # Try to infer peak_kw from total_kwh and duration where possible

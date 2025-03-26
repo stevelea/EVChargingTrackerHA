@@ -1,0 +1,36 @@
+ValueError: Invalid value of type 'narwhals.stable.v1.Series' received for the 'size' property of scatter.marker Received value: ┌────────────────────────────┐ | Narwhals Series | |----------------------------| |0 None | |1 None | |2 None | |3 None | |4 None | |5 None | |6 None | |14 None | |13 None | |12 None | |11 None | |8 None | |9 None | |7 None | |10 None | |15 None | |16 None | |Name: peak_kw, dtype: object| └────────────────────────────┘ The 'size' property is a number and may be specified as: - An int or float in the interval [0, inf] - A tuple, list, or one-dimensional numpy array of the above
+Traceback:
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 640, in code_to_exec
+    exec(code, module.__dict__)
+File "/home/runner/workspace/app.py", line 200, in <module>
+    charts = create_visualizations(data)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/data_visualizer.py", line 23, in create_visualizations
+    figures['time_series'] = px.scatter(
+                             ^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/plotly/express/_chart_types.py", line 69, in scatter
+    return make_figure(args=locals(), constructor=go.Scatter)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/plotly/express/_core.py", line 2673, in make_figure
+    trace.update(patch)
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/plotly/basedatatypes.py", line 5125, in update
+    BaseFigure._perform_update(self, dict1, overwrite=overwrite)
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/plotly/basedatatypes.py", line 3905, in _perform_update
+    BaseFigure._perform_update(plotly_obj[key], val)
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/plotly/basedatatypes.py", line 3926, in _perform_update
+    plotly_obj[key] = val
+    ~~~~~~~~~~^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/plotly/basedatatypes.py", line 4860, in __setitem__
+    self._set_prop(prop, value)
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/plotly/basedatatypes.py", line 5204, in _set_prop
+    raise err
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/plotly/basedatatypes.py", line 5199, in _set_prop
+    val = validator.validate_coerce(val)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/_plotly_utils/basevalidators.py", line 769, in validate_coerce
+    self.raise_invalid_val(v)
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/_plotly_utils/basevalidators.py", line 299, in raise_invalid_val
+    raise ValueError(

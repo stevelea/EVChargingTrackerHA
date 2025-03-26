@@ -19,6 +19,13 @@ def create_visualizations(data):
     # Ensure data is sorted by date
     data = data.sort_values('date')
     
+    # Ensure numeric fields are properly converted to float
+    numeric_columns = ['total_kwh', 'peak_kw', 'cost_per_kwh', 'total_cost']
+    for col in numeric_columns:
+        if col in data.columns:
+            # Handle NaN and None values by filling with 0
+            data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0)
+    
     # Time series of charging sessions
     figures['time_series'] = px.scatter(
         data,
