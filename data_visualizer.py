@@ -302,4 +302,63 @@ def create_visualizations(data):
         xaxis={'categoryorder':'total descending'}
     )
     
+    # Provider comparison - added for Tesla API integration
+    if 'provider' in data.columns and len(data['provider'].unique()) > 1:
+        # Group by provider for comparison
+        provider_stats = data.groupby('provider').agg({
+            'total_cost': 'sum',
+            'total_kwh': 'sum',
+            'peak_kw': 'mean',
+            'date': 'count'  # Count of sessions
+        }).reset_index()
+        
+        # Calculate average cost per kWh for each provider
+        provider_stats['avg_cost_per_kwh'] = provider_stats['total_cost'] / provider_stats['total_kwh']
+        provider_stats = provider_stats.rename(columns={'date': 'sessions'})
+        
+        # Sort by total cost
+        provider_stats = provider_stats.sort_values('total_cost', ascending=False)
+        
+        # Create cost comparison chart
+        figures['provider_cost_comparison'] = px.bar(
+            provider_stats,
+            x='provider',
+            y='total_cost',
+            title='Cost Comparison by Provider',
+            labels={
+                'provider': 'Provider',
+                'total_cost': 'Total Cost ($)'
+            },
+            color='avg_cost_per_kwh',
+            color_continuous_scale='RdYlGn_r',
+            hover_data=['total_kwh', 'avg_cost_per_kwh', 'sessions']
+        )
+        
+        figures['provider_cost_comparison'].update_layout(
+            xaxis_title='Provider',
+            yaxis_title='Total Cost ($)'
+        )
+        
+        # Create kwh comparison chart
+        figures['provider_kwh_comparison'] = px.bar(
+            provider_stats,
+            x='provider',
+            y='total_kwh',
+            title='Energy Delivered by Provider',
+            labels={
+                'provider': 'Provider', 
+                'total_kwh': 'Total Energy (kWh)'
+            },
+            color='peak_kw',
+            color_continuous_scale='Viridis',
+            hover_data=['sessions', 'avg_cost_per_kwh']
+        )
+        
+        figures['provider_kwh_comparison'].update_layout(
+            xaxis_title='Provider',
+            yaxis_title='Total Energy (kWh)'
+        )
+        
+        # Add to dashboard preferences in the app (this will be handled in app.py)
+    
     return figures

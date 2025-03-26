@@ -16,7 +16,8 @@ from utils import get_date_range, export_data_as_csv, save_credentials, load_cre
 st.set_page_config(
     page_title="EV Charging Data Analyzer",
     page_icon="⚡",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # Initialize session state for data storage
@@ -44,6 +45,8 @@ if 'dashboard_preferences' not in st.session_state:
             'cost_time_series': {'visible': True, 'order': 5, 'name': 'Cost Over Time'},
             'cost_per_kwh': {'visible': True, 'order': 6, 'name': 'Cost per kWh Trends'},
             'cost_by_location': {'visible': True, 'order': 7, 'name': 'Cost by Location'},
+            'provider_cost_comparison': {'visible': True, 'order': 8, 'name': 'Provider Cost Comparison'},
+            'provider_kwh_comparison': {'visible': True, 'order': 9, 'name': 'Provider Energy Comparison'},
         },
         'layout': 'tabs',  # 'tabs' or 'grid'
         'grid_columns': 2   # Number of columns if using grid layout
@@ -184,7 +187,10 @@ with st.sidebar:
         
         # Fetch data button
         if st.button("Fetch Charging Data"):
-            with st.spinner("Fetching emails..."):
+            all_charging_data = []
+            
+            # Gmail Data Retrieval
+            with st.spinner("Fetching email data..."):
                 try:
                     # Use just search term for now (IMAP search is more limited with complex queries)
                     # Get emails
@@ -209,16 +215,11 @@ with st.sidebar:
                         
                         # Parse emails to extract charging data
                         with st.spinner("Parsing email data..."):
-                            charging_data = parse_charging_emails(filtered_emails)
+                            email_charging_data = parse_charging_emails(filtered_emails)
                             
-                            if charging_data:
-                                # Clean and process the charging data
-                                df = clean_charging_data(charging_data)
-                                
-                                # Store data in session state
-                                st.session_state.charging_data = df
-                                st.session_state.last_refresh = datetime.now()
-                                st.success(f"Successfully extracted data from {len(charging_data)} charging sessions.")
+                            if email_charging_data:
+                                all_charging_data.extend(email_charging_data)
+                                st.success(f"Successfully extracted data from {len(email_charging_data)} charging sessions in emails.")
                             else:
                                 st.warning("No charging data could be extracted from the emails.")
                     else:
@@ -252,7 +253,55 @@ with st.sidebar:
                         except:
                             st.error("Could not automatically restore the connection. Please log out and log back in.")
                     else:
-                        st.error(f"Error fetching data: {error_message}")
+                        st.error(f"Error fetching email data: {error_message}")
+            
+            # Tesla API Data Retrieval (if authenticated)
+            if st.session_state.tesla_authenticated:
+                with st.spinner("Fetching Tesla charging data..."):
+                    try:
+                        # Get Tesla charging history
+                        tesla_client = st.session_state.tesla_client
+                        
+                        # Get vehicles
+                        vehicles = tesla_client.get_vehicles()
+                        if vehicles:
+                            # Select first vehicle
+                            tesla_client.select_vehicle()
+                            
+                            # Get charging history
+                            charging_history = tesla_client.get_charging_history(
+                                start_date=start_date,
+                                end_date=end_date
+                            )
+                            
+                            if charging_history:
+                                # Format Tesla charging data to match app's format
+                                tesla_charging_data = tesla_client.format_charging_data(charging_history)
+                                
+                                if tesla_charging_data:
+                                    all_charging_data.extend(tesla_charging_data)
+                                    st.success(f"Successfully retrieved {len(tesla_charging_data)} charging sessions from Tesla API.")
+                                else:
+                                    st.warning("No charging data could be extracted from Tesla API.")
+                            else:
+                                st.warning("No charging history found in Tesla API.")
+                        else:
+                            st.warning("No vehicles found in Tesla account.")
+                    except Exception as e:
+                        st.error(f"Error fetching Tesla data: {str(e)}")
+            
+            # Process combined data if any was retrieved
+            if all_charging_data:
+                with st.spinner("Processing charging data..."):
+                    # Clean and process the charging data
+                    df = clean_charging_data(all_charging_data)
+                    
+                    # Store data in session state
+                    st.session_state.charging_data = df
+                    st.session_state.last_refresh = datetime.now()
+                    st.success(f"Successfully processed data from {len(all_charging_data)} total charging sessions.")
+            else:
+                st.warning("No charging data was retrieved from any source.")
         
         # Display last refresh time
         if st.session_state.last_refresh:
@@ -378,6 +427,35 @@ if st.session_state.authenticated:
     if st.session_state.charging_data is not None:
         data = st.session_state.charging_data
         
+        # Initialize a provider filter in session state if it doesn't exist
+        if 'provider_filter' not in st.session_state:
+            st.session_state.provider_filter = "All"
+        
+        # Provider filtering
+        st.header("Data Filtering")
+        
+        # Get unique providers from the data
+        providers = ["All"] + sorted(data["provider"].unique().tolist())
+        
+        # Create a dropdown filter for providers
+        selected_provider = st.selectbox(
+            "Filter by provider:", 
+            providers,
+            index=providers.index(st.session_state.provider_filter)
+        )
+        
+        # Store selected provider in session state
+        st.session_state.provider_filter = selected_provider
+        
+        # Apply filter if a specific provider is selected
+        if selected_provider != "All":
+            filtered_data = data[data["provider"] == selected_provider]
+        else:
+            filtered_data = data
+            
+        # Use filtered data for statistics and visualizations
+        data = filtered_data
+            
         # Summary statistics
         st.header("Summary Statistics")
         col1, col2, col3, col4 = st.columns(4)
@@ -431,6 +509,7 @@ if st.session_state.authenticated:
                 'time_series': {'name': 'Time Series', 'charts': ['time_series']},
                 'charging_stats': {'name': 'Charging Statistics', 'charts': ['peak_kw_histogram', 'kwh_by_location', 'charging_duration']},
                 'cost_analysis': {'name': 'Cost Analysis', 'charts': ['cost_time_series', 'cost_per_kwh', 'cost_by_location']},
+                'provider_analysis': {'name': 'Provider Comparison', 'charts': ['provider_cost_comparison', 'provider_kwh_comparison']},
                 'raw_data': {'name': 'Raw Data', 'charts': []}
             }
             
@@ -489,6 +568,24 @@ if st.session_state.authenticated:
                         
                         # Render cost by location chart
                         render_visualization('cost_by_location', charts)
+                    
+                    elif group['name'] == 'Provider Comparison':
+                        # Create a 2-column layout for the provider comparison charts
+                        if (st.session_state.dashboard_preferences['panels'].get('provider_cost_comparison', {}).get('visible', False) or
+                            st.session_state.dashboard_preferences['panels'].get('provider_kwh_comparison', {}).get('visible', False)):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                if st.session_state.dashboard_preferences['panels'].get('provider_cost_comparison', {}).get('visible', False):
+                                    if 'provider_cost_comparison' in charts:
+                                        st.subheader(st.session_state.dashboard_preferences['panels']['provider_cost_comparison']['name'])
+                                        st.plotly_chart(charts['provider_cost_comparison'], use_container_width=True)
+                            
+                            with col2:
+                                if st.session_state.dashboard_preferences['panels'].get('provider_kwh_comparison', {}).get('visible', False):
+                                    if 'provider_kwh_comparison' in charts:
+                                        st.subheader(st.session_state.dashboard_preferences['panels']['provider_kwh_comparison']['name'])
+                                        st.plotly_chart(charts['provider_kwh_comparison'], use_container_width=True)
                     
                     elif group['name'] == 'Raw Data':
                         st.subheader("Raw Data")
