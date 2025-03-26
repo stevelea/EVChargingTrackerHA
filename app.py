@@ -155,6 +155,58 @@ with st.sidebar:
                     file_name=f"ev_charging_data_{datetime.now().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
                 )
+            
+            # SMS Notifications section
+            st.subheader("SMS Notifications")
+            
+            # Check if Twilio credentials are available
+            has_twilio_credentials = check_twilio_credentials()
+            
+            if not has_twilio_credentials:
+                st.warning("Twilio credentials not set. SMS notifications are unavailable.")
+                st.info("To enable SMS notifications, please provide your Twilio credentials through the Replit Secrets.")
+            else:
+                st.session_state.notifications_enabled = st.toggle(
+                    "Enable SMS notifications", 
+                    value=st.session_state.notifications_enabled
+                )
+                
+                if st.session_state.notifications_enabled:
+                    # Phone number input with validation
+                    phone_input = st.text_input(
+                        "Your phone number (with country code, e.g., +1XXXXXXXXXX)",
+                        value=st.session_state.phone_number
+                    )
+                    
+                    # Validate and save phone number
+                    if phone_input:
+                        if phone_input.startswith('+') and len(phone_input) >= 8:
+                            st.session_state.phone_number = phone_input
+                        else:
+                            st.error("Please enter a valid phone number with country code (e.g., +1XXXXXXXXXX)")
+                    
+                    # Test notification button
+                    if st.button("Send Test Notification"):
+                        if st.session_state.phone_number:
+                            # Create a sample notification
+                            sample_data = {
+                                'date': datetime.now().strftime('%Y-%m-%d'),
+                                'location': 'Test Station',
+                                'total_kwh': 25.5,
+                                'total_cost': 12.75,
+                                'cost_per_kwh': 0.50
+                            }
+                            
+                            # Send test notification
+                            with st.spinner("Sending test notification..."):
+                                result = send_charging_notification(sample_data, st.session_state.phone_number)
+                                
+                                if result['success']:
+                                    st.success("Test notification sent successfully!")
+                                else:
+                                    st.error(f"Failed to send notification: {result['message']}")
+                        else:
+                            st.error("Please enter a valid phone number first.")
 
 # Main content area
 if st.session_state.authenticated:
@@ -268,3 +320,7 @@ else:
 # Footer
 st.markdown("---")
 st.write("This app extracts EV charging data from your Gmail receipts. Your data remains private and is not stored on any servers.")
+
+# SMS Notification Info
+if not check_twilio_credentials():
+    st.info("💡 **SMS Notifications Feature**: To enable SMS notifications for new charging sessions, please provide your Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER) through Replit Secrets.")
