@@ -15,15 +15,17 @@ import urllib.parse
 class GmailClient:
     """Class to handle Gmail API authentication and email retrieval"""
     
-    # Google OAuth client ID for web application
-    CLIENT_CONFIG = {
-        "web": {
-            "client_id": "974252666486-2nk6p0ctqtj4u07s4ugt4a5vuvcc9rnf.apps.googleusercontent.com",
-            "client_secret": "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",
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token"
+    # Get Google OAuth client credentials from environment variables
+    @property
+    def CLIENT_CONFIG(self):
+        return {
+            "web": {
+                "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
+                "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token"
+            }
         }
-    }
     
     def __init__(self):
         self.SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
