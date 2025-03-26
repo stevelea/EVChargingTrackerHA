@@ -31,26 +31,29 @@ if 'gmail_client' not in st.session_state:
 # Function to get the base URL for the app
 def get_base_url():
     # Get the base URL for the Streamlit app
-    return st.experimental_get_query_params().get("base_url", [""])[0]
+    params = st.query_params.get_all("base_url")
+    return params[0] if params else ""
 
 # App title and description
 st.title("⚡ EV Charging Data Analyzer")
 st.write("Extract and visualize your EV charging data from Gmail receipts")
 
 # Process OAuth callback
-query_params = st.experimental_get_query_params()
+query_params = st.query_params.to_dict()
 if "code" in query_params and "state" in query_params:
     try:
         # Get the callback URL for authentication
-        base_url = get_base_url() or st.experimental_get_query_params().get("redirect_uri", [""])[0]
-        redirect_uri = f"{base_url}/" if base_url else st.experimental_get_query_params().get("redirect_uri", ["http://localhost:5000"])[0]
+        base_url = get_base_url()
+        redirect_uri_params = st.query_params.get_all("redirect_uri")
+        redirect_uri_param = redirect_uri_params[0] if redirect_uri_params else "http://localhost:5000"
+        redirect_uri = f"{base_url}/" if base_url else redirect_uri_param
         
         # Process OAuth response
         if st.session_state.gmail_client.authorize_with_params(query_params, redirect_uri):
             st.session_state.authenticated = True
             st.success("Authentication successful!")
             # Clear the URL parameters
-            st.experimental_set_query_params()
+            st.query_params.clear()
     except Exception as e:
         st.error(f"Authentication error: {str(e)}")
         st.session_state.authenticated = False
@@ -66,8 +69,10 @@ with st.sidebar:
         st.info("Please authenticate with your Gmail account to access your charging receipts.")
         
         # Get the current URL for the redirect_uri
-        base_url = get_base_url() or st.experimental_get_query_params().get("redirect_uri", ["http://localhost:5000"])[0]
-        redirect_uri = f"{base_url}/" if base_url else "http://localhost:5000"
+        base_url = get_base_url()
+        redirect_uri_params = st.query_params.get_all("redirect_uri")
+        redirect_uri_param = redirect_uri_params[0] if redirect_uri_params else "http://localhost:5000"
+        redirect_uri = f"{base_url}/" if base_url else redirect_uri_param
         
         # Authentication button
         if st.button("Sign in with Google"):
