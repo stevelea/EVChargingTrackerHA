@@ -317,10 +317,15 @@ with st.sidebar:
                         evcc_data = parse_evcc_csv(uploaded_file, default_cost_per_kwh=evcc_cost_per_kwh)
                         
                         if evcc_data:
-                            # If replace_evcc_data is checked, use only EVCC data
+                            # If replace_evcc_data is checked, mark the data for replacement
                             if 'replace_evcc_data' in locals() and replace_evcc_data:
+                                # Add a source marker to identify EVCC data
+                                for item in evcc_data:
+                                    item['source'] = 'EVCC CSV'
+                                
                                 all_charging_data = evcc_data
-                                st.success(f"Successfully loaded {len(evcc_data)} charging sessions from EVCC CSV.")
+                                st.session_state.replace_evcc_data = True
+                                st.success(f"Successfully loaded {len(evcc_data)} charging sessions from EVCC CSV. Existing EVCC data will be replaced.")
                                 
                                 # Skip further data retrieval
                                 skip_other_sources = True
@@ -472,6 +477,14 @@ with st.sidebar:
                         existing_data = load_charging_data()
                         
                         if existing_data:
+                            # Check if we're replacing EVCC data
+                            if hasattr(st.session_state, 'replace_evcc_data') and st.session_state.replace_evcc_data:
+                                # Remove all existing EVCC data first
+                                existing_data = [item for item in existing_data if item.get('source') != 'EVCC CSV']
+                                st.info("Removing existing EVCC data before merging.")
+                                # Reset the flag
+                                st.session_state.replace_evcc_data = False
+                                
                             # Merge new data with existing data (avoiding duplicates)
                             combined_data = merge_charging_data(existing_data, all_charging_data)
                             st.info(f"Merged {len(all_charging_data)} new charging sessions with {len(existing_data)} existing sessions.")

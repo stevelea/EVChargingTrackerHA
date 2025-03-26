@@ -379,6 +379,7 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
                 'time': None,
                 'location': 'EVCC Charger',  # Default location
                 'provider': 'EVCC',  # Set provider to EVCC
+                'source': 'EVCC CSV',  # Mark the source for identification in replace operations
                 'total_kwh': None,
                 'peak_kw': None,
                 'duration': None,
