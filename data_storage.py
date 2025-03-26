@@ -70,13 +70,26 @@ def save_charging_data(data_list):
         # Create a copy so we don't modify the original
         record_copy = record.copy()
         
-        # Convert date to string if it's a datetime
-        if 'date' in record_copy and isinstance(record_copy['date'], datetime):
-            record_copy['date'] = record_copy['date'].isoformat()
+        # Convert date to string if it's a datetime or date object
+        if 'date' in record_copy:
+            # Check for datetime.date or datetime.datetime types
+            if isinstance(record_copy['date'], datetime):
+                record_copy['date'] = record_copy['date'].isoformat()
+            elif hasattr(record_copy['date'], 'isoformat'):  # covers both date and datetime
+                record_copy['date'] = record_copy['date'].isoformat()
+            elif not isinstance(record_copy['date'], str):
+                # Last resort, convert to string
+                record_copy['date'] = str(record_copy['date'])
         
         # Convert time to string if it's a time object
         if 'time' in record_copy and hasattr(record_copy['time'], 'strftime'):
             record_copy['time'] = record_copy['time'].strftime('%H:%M:%S')
+        
+        # Also handle other non-serializable objects 
+        for key, value in record_copy.items():
+            if not isinstance(value, (str, int, float, bool, list, dict, type(None))):
+                # Convert to string for any other non-serializable types
+                record_copy[key] = str(value)
         
         # Generate record ID if not present
         if 'id' not in record_copy:
@@ -84,9 +97,9 @@ def save_charging_data(data_list):
             
         serializable_data.append(record_copy)
     
-    # Write to file
+    # Write to file using a custom JSON encoder for any remaining datetime objects
     with open(CHARGING_DATA_FILE, 'w') as f:
-        json.dump(serializable_data, f, indent=2)
+        json.dump(serializable_data, f, indent=2, default=str)
 
 def load_charging_data():
     """
@@ -107,11 +120,45 @@ def load_charging_data():
         # Convert string dates back to datetime objects
         for record in data:
             if 'date' in record and isinstance(record['date'], str):
-                try:
-                    record['date'] = datetime.fromisoformat(record['date'])
-                except ValueError:
-                    # If conversion fails, leave as string
-                    pass
+                # Try different date formats for parsing
+                date_formats = [
+                    # ISO format with various separators
+                    '%Y-%m-%dT%H:%M:%S',      # ISO format with time
+                    '%Y-%m-%dT%H:%M:%S.%f',   # ISO format with milliseconds
+                    '%Y-%m-%d',               # ISO date only
+                    
+                    # Other common formats
+                    '%m/%d/%Y',               # US format
+                    '%d/%m/%Y',               # UK/AU format
+                    '%B %d, %Y',              # Month name format
+                    '%d-%m-%Y',               # Dash-separated format
+                    '%d-%m-%y',               # Two-digit year format
+                ]
+                
+                parsed_date = None
+                for fmt in date_formats:
+                    try:
+                        if 'T' in record['date'] and 'T' not in fmt:
+                            # Skip non-ISO formats for ISO strings
+                            continue
+                        
+                        # For ISO datetime format, try parsing just with fromisoformat
+                        if fmt == '%Y-%m-%dT%H:%M:%S' or fmt == '%Y-%m-%dT%H:%M:%S.%f':
+                            try:
+                                parsed_date = datetime.fromisoformat(record['date'])
+                                break
+                            except ValueError:
+                                continue
+                        
+                        # Otherwise use strptime
+                        parsed_date = datetime.strptime(record['date'], fmt)
+                        break
+                    except ValueError:
+                        continue
+                
+                if parsed_date:
+                    record['date'] = parsed_date
+                # If parsing fails, leave as string - don't discard the data
         
         return data
     except Exception as e:
@@ -188,20 +235,72 @@ def filter_data_by_date_range(data, start_date, end_date):
     else:
         # If data is a list of dictionaries
         filtered_data = []
+        
+        # Function to parse date strings in multiple formats
+        def parse_date_string(date_str):
+            # Try different date formats for parsing
+            date_formats = [
+                # ISO format with various separators
+                '%Y-%m-%dT%H:%M:%S',      # ISO format with time
+                '%Y-%m-%dT%H:%M:%S.%f',   # ISO format with milliseconds
+                '%Y-%m-%d',               # ISO date only
+                
+                # Other common formats
+                '%m/%d/%Y',               # US format
+                '%d/%m/%Y',               # UK/AU format
+                '%B %d, %Y',              # Month name format
+                '%d-%m-%Y',               # Dash-separated format
+                '%d-%m-%y',               # Two-digit year format
+            ]
+            
+            # First try fromisoformat for ISO strings
+            try:
+                return datetime.fromisoformat(date_str)
+            except ValueError:
+                pass
+                
+            # Then try other formats
+            for fmt in date_formats:
+                try:
+                    return datetime.strptime(date_str, fmt)
+                except ValueError:
+                    continue
+                    
+            # Return None if parsing fails
+            return None
+            
         for record in data:
             if 'date' in record:
                 record_date = record['date']
+                
                 # Convert to datetime if it's a string
                 if isinstance(record_date, str):
-                    try:
-                        record_date = datetime.fromisoformat(record_date)
-                    except ValueError:
+                    parsed_date = parse_date_string(record_date)
+                    if parsed_date is None:
                         # Skip this record if date can't be parsed
                         continue
+                    record_date = parsed_date
                 
-                # Check if date is within range
-                if start_date <= record_date <= end_date:
-                    filtered_data.append(record)
+                # Handle date type
+                if hasattr(record_date, 'date') and callable(getattr(record_date, 'date')):
+                    # If it's a datetime, get just the date part for comparison
+                    record_date = record_date.date()
+                    
+                    # Convert start_date and end_date to date objects if they're datetimes
+                    start_date_obj = start_date.date() if hasattr(start_date, 'date') else start_date
+                    end_date_obj = end_date.date() if hasattr(end_date, 'date') else end_date
+                    
+                    # Check if date is within range
+                    if start_date_obj <= record_date <= end_date_obj:
+                        filtered_data.append(record)
+                else:
+                    # If it's already a date or another type
+                    try:
+                        if start_date <= record_date <= end_date:
+                            filtered_data.append(record)
+                    except TypeError:
+                        # If comparison fails, try to compare strings
+                        continue
         
         return filtered_data
 
