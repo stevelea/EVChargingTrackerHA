@@ -63,21 +63,39 @@ with st.sidebar:
             st.info("1. Click the link below to authorize with Google:")
             st.markdown(f"[Authorize with Google]({st.session_state.auth_url})")
             
-            st.info("2. Google will display an authorization code. Copy that code and paste it below:")
-            auth_code = st.text_input("Authorization Code", key="auth_code")
+            st.info("""2. After you authorize the app, you'll be redirected to a page that says:
             
-            if st.button("Submit Authorization Code"):
-                if auth_code:
+            "This site can't be reached" or "localhost refused to connect"
+            
+            3. That's normal! Look at your address bar - it contains the authorization code:
+            
+            https://localhost/?state=xyz...&code=4/0Adeu...&scope=email+https...
+            
+            4. Copy the ENTIRE URL from your address bar after being redirected.""")
+            
+            auth_url = st.text_input("Paste the FULL redirect URL here:", key="auth_url_redirect")
+            
+            if st.button("Submit"):
+                if auth_url:
                     try:
-                        # Use the code to get credentials
-                        if st.session_state.gmail_client.authorize_with_code(auth_code):
-                            st.session_state.authenticated = True
-                            st.success("Authentication successful!")
-                            st.rerun()
+                        # Extract code from URL
+                        import urllib.parse
+                        parsed_url = urllib.parse.urlparse(auth_url)
+                        query_params = urllib.parse.parse_qs(parsed_url.query)
+                        
+                        if 'code' in query_params:
+                            auth_code = query_params['code'][0]
+                            # Use the code to get credentials
+                            if st.session_state.gmail_client.authorize_with_code(auth_code):
+                                st.session_state.authenticated = True
+                                st.success("Authentication successful!")
+                                st.rerun()
+                        else:
+                            st.error("No authorization code found in the URL. Please copy the complete URL after being redirected.")
                     except Exception as e:
                         st.error(f"Authentication error: {str(e)}")
                 else:
-                    st.error("Please enter the authorization code from Google")
+                    st.error("Please enter the complete redirect URL from your browser's address bar")
     else:
         st.success("Authenticated with Gmail")
         if st.button("Logout"):

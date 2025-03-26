@@ -37,12 +37,12 @@ class GmailClient:
         self.state = secrets.token_urlsafe(16)  # Generate a random state token
     
     def get_authorization_url(self):
-        """Get the authorization URL for the user to authenticate with Google using manual code entry"""
-        # Create flow instance using client config with out-of-band redirect
+        """Get the authorization URL for the user to authenticate with Google"""
+        # Create flow instance using client config with localhost redirect
         self.flow = Flow.from_client_config(
             self.CLIENT_CONFIG,
             scopes=self.SCOPES,
-            redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # Use out-of-band flow (no redirect)
+            redirect_uri='https://localhost'  # This doesn't need to be a real page, just a valid URL format
         )
         
         # Generate the auth URL
@@ -55,16 +55,16 @@ class GmailClient:
         return auth_url
     
     def authorize_with_code(self, code):
-        """Authorize using the code directly provided by the user"""
+        """Authorize using the auth code provided by the user"""
         if not code:
             raise ValueError("No authorization code provided")
         
         try:
-            # Reset flow with out-of-band redirect
+            # Reset flow with same redirect URI
             self.flow = Flow.from_client_config(
                 self.CLIENT_CONFIG,
                 scopes=self.SCOPES,
-                redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # Use out-of-band flow
+                redirect_uri='https://localhost'  # Must match the one used in get_authorization_url
             )
             
             # Exchange the code for credentials
