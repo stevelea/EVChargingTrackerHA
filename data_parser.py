@@ -332,9 +332,6 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
         if headers and len(headers) > 0 and headers[0].startswith('\ufeff'):
             headers[0] = headers[0].replace('\ufeff', '')
         
-        # Debug the headers
-        st.debug(f"CSV Headers: {headers}")
-        
         # Check if this is a valid EVCC CSV file by looking for common fields
         required_fields = ['Created', 'Energy (kWh)']  # Updated required fields for the sample
         has_required_fields = all(field in headers for field in required_fields)
@@ -396,7 +393,6 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
                     data['date'] = timestamp.date()
                     data['time'] = timestamp.time()
                 except Exception as e:
-                    st.debug(f"Date parsing error: {str(e)}")
                     # Fallback to current time
                     now = datetime.now()
                     data['date'] = now.date()
@@ -445,7 +441,7 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
     except Exception as e:
         st.error(f"Error parsing EVCC CSV: {str(e)}")
         import traceback
-        st.debug(traceback.format_exc())
+        st.error(traceback.format_exc())
         return []
     
     st.success(f"Successfully parsed {len(charging_data)} charging sessions from EVCC CSV")
