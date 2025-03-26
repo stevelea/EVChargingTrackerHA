@@ -400,11 +400,16 @@ with st.sidebar:
                         # Create checkboxes for each row
                         for idx, row in df_page.iterrows():
                             record_id = row['ID']
+                            # Use both the index and the record_id to ensure uniqueness
+                            checkbox_key = f"delete_{idx}_{record_id}"
                             col1, col2 = st.columns([1, 10])
                             
                             with col1:
-                                if st.checkbox("", key=f"delete_{record_id}", 
-                                              value=record_id in st.session_state.selected_records_to_delete):
+                                is_checked = st.checkbox("", key=checkbox_key, 
+                                                        value=record_id in st.session_state.selected_records_to_delete)
+                                
+                                # Update the selection list based on checkbox state
+                                if is_checked:
                                     if record_id not in st.session_state.selected_records_to_delete:
                                         st.session_state.selected_records_to_delete.append(record_id)
                                 else:
