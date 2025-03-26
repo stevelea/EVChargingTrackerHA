@@ -55,6 +55,8 @@ if 'tesla_client' not in st.session_state:
     st.session_state.tesla_client = TeslaApiClient()
 if 'tesla_authenticated' not in st.session_state:
     st.session_state.tesla_authenticated = False
+if 'auto_fetch_data' not in st.session_state:
+    st.session_state.auto_fetch_data = False
 
 # Initialize dashboard preferences
 if 'dashboard_preferences' not in st.session_state:
@@ -139,8 +141,11 @@ with st.sidebar:
                             # Save credentials if requested
                             if save_email:
                                 save_credentials(email_address)
+                            
+                            # Set a flag to auto-fetch data after authentication
+                            st.session_state.auto_fetch_data = True
                                 
-                            st.success("Authentication successful!")
+                            st.success("Authentication successful! Automatically fetching your charging data...")
                             st.rerun()
                     except Exception as e:
                         st.error(f"Authentication error: {str(e)}")
