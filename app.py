@@ -28,6 +28,22 @@ if 'authenticated' not in st.session_state:
 if 'gmail_client' not in st.session_state:
     st.session_state.gmail_client = GmailClient()
 
+# Initialize dashboard preferences
+if 'dashboard_preferences' not in st.session_state:
+    st.session_state.dashboard_preferences = {
+        'panels': {
+            'time_series': {'visible': True, 'order': 1, 'name': 'Charging Sessions Over Time'},
+            'peak_kw_histogram': {'visible': True, 'order': 2, 'name': 'Peak Power Distribution'},
+            'kwh_by_location': {'visible': True, 'order': 3, 'name': 'Energy by Location'},
+            'charging_duration': {'visible': True, 'order': 4, 'name': 'Charging Efficiency'},
+            'cost_time_series': {'visible': True, 'order': 5, 'name': 'Cost Over Time'},
+            'cost_per_kwh': {'visible': True, 'order': 6, 'name': 'Cost per kWh Trends'},
+            'cost_by_location': {'visible': True, 'order': 7, 'name': 'Cost by Location'},
+        },
+        'layout': 'tabs',  # 'tabs' or 'grid'
+        'grid_columns': 2   # Number of columns if using grid layout
+    }
+
 # App title and description
 st.title("⚡ EV Charging Data Analyzer")
 st.write("Extract and visualize your EV charging data from Gmail receipts")
@@ -172,6 +188,109 @@ with st.sidebar:
                     file_name=f"ev_charging_data_{datetime.now().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
                 )
+            
+            # Dashboard customization
+            st.subheader("Dashboard Customization")
+            
+            # Layout selection
+            st.session_state.dashboard_preferences['layout'] = st.radio(
+                "Layout Style",
+                ["tabs", "grid"],
+                index=0 if st.session_state.dashboard_preferences['layout'] == 'tabs' else 1,
+                horizontal=True,
+                format_func=lambda x: "Tabbed Layout" if x == "tabs" else "Grid Layout"
+            )
+            
+            # If grid layout, let user select number of columns
+            if st.session_state.dashboard_preferences['layout'] == 'grid':
+                st.session_state.dashboard_preferences['grid_columns'] = st.slider(
+                    "Number of columns in grid", 
+                    min_value=1, 
+                    max_value=3, 
+                    value=st.session_state.dashboard_preferences['grid_columns']
+                )
+            
+            # Visualization selection and ordering
+            st.write("Select and order visualizations:")
+            
+            # Create a temporary list for sorting
+            viz_list = []
+            for viz_id, viz_props in st.session_state.dashboard_preferences['panels'].items():
+                viz_list.append({
+                    'id': viz_id,
+                    'name': viz_props['name'],
+                    'visible': viz_props['visible'],
+                    'order': viz_props['order']
+                })
+            
+            # Sort by order
+            viz_list = sorted(viz_list, key=lambda x: x['order'])
+            
+            # Create multiselect for choosing visible visualizations
+            selected_viz = st.multiselect(
+                "Select visualizations to display",
+                options=[viz['id'] for viz in viz_list],
+                default=[viz['id'] for viz in viz_list if viz['visible']],
+                format_func=lambda x: st.session_state.dashboard_preferences['panels'][x]['name']
+            )
+            
+            # Update visibility based on selection
+            for viz_id in st.session_state.dashboard_preferences['panels']:
+                st.session_state.dashboard_preferences['panels'][viz_id]['visible'] = viz_id in selected_viz
+            
+            # Allow reordering for visible visualizations
+            st.write("Drag to reorder visualizations:")
+            
+            # Filter for visible visualizations only
+            visible_viz = [v for v in viz_list if v['id'] in selected_viz]
+            
+            # Create a draggable list for reordering
+            for i, viz in enumerate(visible_viz):
+                col1, col2 = st.columns([5, 1])
+                
+                with col1:
+                    st.write(f"{viz['name']}")
+                
+                with col2:
+                    # Move up button (disabled for first item)
+                    if i > 0 and st.button("↑", key=f"up_{viz['id']}"):
+                        # Swap order with previous item
+                        current_order = st.session_state.dashboard_preferences['panels'][viz['id']]['order']
+                        prev_id = visible_viz[i-1]['id']
+                        prev_order = st.session_state.dashboard_preferences['panels'][prev_id]['order']
+                        
+                        st.session_state.dashboard_preferences['panels'][viz['id']]['order'] = prev_order
+                        st.session_state.dashboard_preferences['panels'][prev_id]['order'] = current_order
+                        st.rerun()
+                    
+                    # Move down button (disabled for last item)
+                    if i < len(visible_viz) - 1 and st.button("↓", key=f"down_{viz['id']}"):
+                        # Swap order with next item
+                        current_order = st.session_state.dashboard_preferences['panels'][viz['id']]['order']
+                        next_id = visible_viz[i+1]['id']
+                        next_order = st.session_state.dashboard_preferences['panels'][next_id]['order']
+                        
+                        st.session_state.dashboard_preferences['panels'][viz['id']]['order'] = next_order
+                        st.session_state.dashboard_preferences['panels'][next_id]['order'] = current_order
+                        st.rerun()
+            
+            # Reset button
+            if st.button("Reset to Default Layout"):
+                # Reset to default preferences
+                st.session_state.dashboard_preferences = {
+                    'panels': {
+                        'time_series': {'visible': True, 'order': 1, 'name': 'Charging Sessions Over Time'},
+                        'peak_kw_histogram': {'visible': True, 'order': 2, 'name': 'Peak Power Distribution'},
+                        'kwh_by_location': {'visible': True, 'order': 3, 'name': 'Energy by Location'},
+                        'charging_duration': {'visible': True, 'order': 4, 'name': 'Charging Efficiency'},
+                        'cost_time_series': {'visible': True, 'order': 5, 'name': 'Cost Over Time'},
+                        'cost_per_kwh': {'visible': True, 'order': 6, 'name': 'Cost per kWh Trends'},
+                        'cost_by_location': {'visible': True, 'order': 7, 'name': 'Cost by Location'},
+                    },
+                    'layout': 'tabs',
+                    'grid_columns': 2
+                }
+                st.rerun()
 
 # Main content area
 if st.session_state.authenticated:
@@ -215,39 +334,117 @@ if st.session_state.authenticated:
                 avg_cost_per_kwh = 0
             st.metric("Avg. Cost per kWh", f"${avg_cost_per_kwh:.2f}")
         
-        # Visualization tabs
-        tab1, tab2, tab3, tab4 = st.tabs(["Time Series", "Charging Statistics", "Cost Analysis", "Raw Data"])
+        # Generate all charts
+        charts = create_visualizations(data)
         
-        with tab1:
-            st.subheader("Charging Sessions Over Time")
-            charts = create_visualizations(data)
-            st.plotly_chart(charts['time_series'], use_container_width=True)
+        # Function to render a visualization panel
+        def render_visualization(viz_id, charts):
+            if viz_id in charts and st.session_state.dashboard_preferences['panels'][viz_id]['visible']:
+                st.subheader(st.session_state.dashboard_preferences['panels'][viz_id]['name'])
+                st.plotly_chart(charts[viz_id], use_container_width=True)
         
-        with tab2:
-            st.subheader("Charging Power Distribution")
-            col1, col2 = st.columns(2)
+        # Create dynamic dashboard based on user preferences
+        if st.session_state.dashboard_preferences['layout'] == 'tabs':
+            # Create tabs for each visible visualization group
+            tab_groups = {
+                'time_series': {'name': 'Time Series', 'charts': ['time_series']},
+                'charging_stats': {'name': 'Charging Statistics', 'charts': ['peak_kw_histogram', 'kwh_by_location', 'charging_duration']},
+                'cost_analysis': {'name': 'Cost Analysis', 'charts': ['cost_time_series', 'cost_per_kwh', 'cost_by_location']},
+                'raw_data': {'name': 'Raw Data', 'charts': []}
+            }
             
-            with col1:
-                st.plotly_chart(charts['peak_kw_histogram'], use_container_width=True)
+            # Filter for at least one visible chart in each tab group
+            visible_tabs = []
+            for group_id, group in tab_groups.items():
+                if group_id == 'raw_data' or any(chart_id in charts and 
+                                              st.session_state.dashboard_preferences['panels'].get(chart_id, {}).get('visible', False) 
+                                              for chart_id in group['charts']):
+                    visible_tabs.append(group)
             
-            with col2:
-                st.plotly_chart(charts['kwh_by_location'], use_container_width=True)
+            # Create tabs
+            tabs = st.tabs([group['name'] for group in visible_tabs])
+            
+            # Populate each tab
+            for i, (tab, group) in enumerate(zip(tabs, visible_tabs)):
+                with tab:
+                    if group['name'] == 'Time Series':
+                        # Render time series chart
+                        render_visualization('time_series', charts)
+                    
+                    elif group['name'] == 'Charging Statistics':
+                        # Create a 2-column layout for the first two charts
+                        if (st.session_state.dashboard_preferences['panels'].get('peak_kw_histogram', {}).get('visible', False) or
+                            st.session_state.dashboard_preferences['panels'].get('kwh_by_location', {}).get('visible', False)):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                if st.session_state.dashboard_preferences['panels'].get('peak_kw_histogram', {}).get('visible', False):
+                                    st.subheader(st.session_state.dashboard_preferences['panels']['peak_kw_histogram']['name'])
+                                    st.plotly_chart(charts['peak_kw_histogram'], use_container_width=True)
+                            
+                            with col2:
+                                if st.session_state.dashboard_preferences['panels'].get('kwh_by_location', {}).get('visible', False):
+                                    st.subheader(st.session_state.dashboard_preferences['panels']['kwh_by_location']['name'])
+                                    st.plotly_chart(charts['kwh_by_location'], use_container_width=True)
+                        
+                        # Render charging duration chart
+                        render_visualization('charging_duration', charts)
+                    
+                    elif group['name'] == 'Cost Analysis':
+                        # Create a 2-column layout for the first two charts
+                        if (st.session_state.dashboard_preferences['panels'].get('cost_time_series', {}).get('visible', False) or
+                            st.session_state.dashboard_preferences['panels'].get('cost_per_kwh', {}).get('visible', False)):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                if st.session_state.dashboard_preferences['panels'].get('cost_time_series', {}).get('visible', False):
+                                    st.subheader(st.session_state.dashboard_preferences['panels']['cost_time_series']['name'])
+                                    st.plotly_chart(charts['cost_time_series'], use_container_width=True)
+                            
+                            with col2:
+                                if st.session_state.dashboard_preferences['panels'].get('cost_per_kwh', {}).get('visible', False):
+                                    st.subheader(st.session_state.dashboard_preferences['panels']['cost_per_kwh']['name'])
+                                    st.plotly_chart(charts['cost_per_kwh'], use_container_width=True)
+                        
+                        # Render cost by location chart
+                        render_visualization('cost_by_location', charts)
+                    
+                    elif group['name'] == 'Raw Data':
+                        st.subheader("Raw Data")
+        
+        else:  # Grid layout
+            # Create a list of visible visualizations sorted by order
+            viz_list = []
+            for viz_id, viz_props in st.session_state.dashboard_preferences['panels'].items():
+                if viz_props['visible'] and viz_id in charts:
+                    viz_list.append({
+                        'id': viz_id,
+                        'name': viz_props['name'],
+                        'order': viz_props['order']
+                    })
+            
+            # Sort by order
+            viz_list = sorted(viz_list, key=lambda x: x['order'])
+            
+            # Determine how many columns to use
+            num_columns = st.session_state.dashboard_preferences['grid_columns']
+            
+            # Split visualizations into rows based on number of columns
+            viz_rows = []
+            for i in range(0, len(viz_list), num_columns):
+                viz_rows.append(viz_list[i:i + num_columns])
+            
+            # Render each row
+            for row in viz_rows:
+                columns = st.columns(num_columns)
                 
-            st.plotly_chart(charts['charging_duration'], use_container_width=True)
-        
-        with tab3:
-            st.subheader("Cost Analysis")
-            col1, col2 = st.columns(2)
+                for i, viz in enumerate(row):
+                    if i < len(columns):  # Safety check
+                        with columns[i]:
+                            st.subheader(viz['name'])
+                            st.plotly_chart(charts[viz['id']], use_container_width=True)
             
-            with col1:
-                st.plotly_chart(charts['cost_time_series'], use_container_width=True)
-            
-            with col2:
-                st.plotly_chart(charts['cost_per_kwh'], use_container_width=True)
-                
-            st.plotly_chart(charts['cost_by_location'], use_container_width=True)
-        
-        with tab4:
+            # Add Raw Data section at the end
             st.subheader("Raw Data")
             
             # Filters
