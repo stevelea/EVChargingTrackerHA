@@ -24,7 +24,8 @@ class GmailClient:
                 "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": ["https://replit.com/auth/callback"]
+                # The redirect_uris will be passed dynamically when creating the Flow
+                "redirect_uris": []
             }
         }
     
