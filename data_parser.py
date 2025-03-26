@@ -123,19 +123,48 @@ def parse_charging_emails(emails):
                         continue
                 
                 if parsed_date:
-                    # Successfully parsed the date string
+                    # Successfully parsed the date string (timezone-naive)
                     data['date'] = parsed_date
                 elif email.get('date'):
-                    # Use email date as fallback
+                    # Use email date as fallback (might be timezone-aware)
                     data['date'] = email['date']
                 else:
-                    # Last resort fallback to today
+                    # Last resort fallback to today (timezone-naive)
                     data['date'] = datetime.now()
+                
+                # Normalize timezone handling
+                # First, if the date is timezone-naive, make it timezone-aware (UTC)
+                if hasattr(data['date'], 'tzinfo') and data['date'].tzinfo is None:
+                    try:
+                        import pytz
+                        data['date'] = data['date'].replace(tzinfo=pytz.UTC)
+                    except ImportError:
+                        # If pytz is not available, use simpler approach
+                        try:
+                            from datetime import timezone
+                            data['date'] = data['date'].replace(tzinfo=timezone.utc)
+                        except:
+                            pass  # If replace fails, keep the original
+                
+                # Then, strip timezone info to make all dates timezone-naive
+                if hasattr(data['date'], 'tzinfo') and data['date'].tzinfo is not None:
+                    try:
+                        data['date'] = data['date'].replace(tzinfo=None)
+                    except:
+                        pass  # If replace fails, keep the original
+                
             elif email.get('date'):
-                # Use email date as fallback
+                # Use email date as fallback (might be timezone-aware)
                 data['date'] = email['date']
+                
+                # Normalize timezone
+                if hasattr(data['date'], 'tzinfo') and data['date'].tzinfo is not None:
+                    try:
+                        data['date'] = data['date'].replace(tzinfo=None)
+                    except:
+                        pass  # If replace fails, keep the original
             else:
-                # Last resort fallback
+                # Last resort fallback - timezone-naive datetime
                 data['date'] = datetime.now()
             
             # Convert time to standard format if possible
@@ -190,11 +219,28 @@ def clean_charging_data(charging_data):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
     
-    # Ensure date column is datetime
+    # Ensure date column is datetime with consistent timezone handling
     if 'date' in df.columns:
+        # Convert to datetime
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        
         # Fill missing dates with current date as fallback
         df['date'] = df['date'].fillna(pd.Timestamp.now())
+        
+        # Handle mixed timezone-aware and timezone-naive datetimes
+        # First make timezone-naive datetimes timezone-aware (UTC)
+        try:
+            df['date'] = df['date'].apply(
+                lambda x: x.tz_localize('UTC') if pd.notnull(x) and x.tzinfo is None else x
+            )
+            
+            # Then make all datetimes timezone-naive for consistent comparison
+            df['date'] = df['date'].apply(
+                lambda x: x.tz_localize(None) if pd.notnull(x) and x.tzinfo is not None else x
+            )
+        except:
+            # Fallback if timezone handling fails
+            print("Warning: Unable to normalize timezones in date column")
     
     # Fill missing values
     if 'peak_kw' in df.columns and 'total_kwh' in df.columns and 'duration' in df.columns:

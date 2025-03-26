@@ -16,8 +16,28 @@ def create_visualizations(data):
     """
     figures = {}
     
-    # Ensure data is sorted by date
-    data = data.sort_values('date')
+    # Normalize datetime timezone handling for date column
+    if 'date' in data.columns:
+        # First ensure the column is datetime
+        data['date'] = pd.to_datetime(data['date'], errors='coerce')
+        
+        # Handle mixed timezone-aware and timezone-naive timestamps by converting all to UTC and then removing timezone
+        # Make timezone-naive timestamps timezone-aware (assume UTC)
+        data['date'] = data['date'].apply(
+            lambda x: x.tz_localize('UTC') if x is not None and x.tzinfo is None else x
+        )
+        
+        # Then make all timestamps timezone-naive for consistent comparison
+        data['date'] = data['date'].apply(
+            lambda x: x.tz_localize(None) if x is not None and x.tzinfo is not None else x
+        )
+    
+    # Now sort by date after timezone normalization
+    try:
+        data = data.sort_values('date')
+    except TypeError:
+        # If there's still an issue, we'll handle it gracefully
+        print("Warning: Unable to sort by date due to inconsistent timezone information")
     
     # Ensure numeric fields are properly converted to float
     numeric_columns = ['total_kwh', 'peak_kw', 'cost_per_kwh', 'total_cost']
@@ -25,10 +45,6 @@ def create_visualizations(data):
         if col in data.columns:
             # Handle NaN and None values by filling with 0
             data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0)
-    
-    # Make sure date column is datetime
-    if 'date' in data.columns:
-        data['date'] = pd.to_datetime(data['date'], errors='coerce')
     
     # Pre-convert all series to lists for plotly
     # This prevents the "narwhals.stable.v1.Series" error
@@ -133,6 +149,16 @@ def create_visualizations(data):
                 # Convert date to datetime if it's not already
                 if not pd.api.types.is_datetime64_any_dtype(monthly_data['date']):
                     monthly_data['date'] = pd.to_datetime(monthly_data['date'], errors='coerce')
+                
+                # Ensure all dates have consistent timezone handling
+                # First localize naive timestamps to UTC
+                monthly_data['date'] = monthly_data['date'].apply(
+                    lambda x: x.tz_localize('UTC') if x is not None and x.tzinfo is None else x
+                )
+                # Then make all timestamps naive for consistent comparison
+                monthly_data['date'] = monthly_data['date'].apply(
+                    lambda x: x.tz_localize(None) if x is not None and x.tzinfo is not None else x
+                )
                 
                 # Extract month for aggregation without using dt accessor
                 monthly_data['month_year'] = monthly_data['date'].apply(
