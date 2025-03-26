@@ -38,27 +38,36 @@ class GmailClient:
     
     def get_authorization_instructions(self):
         """
-        Returns instructions for manual authorization without 
-        using OAuth redirects or specific redirect URIs.
+        Returns instructions for manual authorization using the Google OAuth Playground.
         """
-        # Just return the OAuth consent screen URL - the user will need to manually copy the code
-        return """
-        1. Go to your Google Cloud Console: https://console.cloud.google.com/apis/credentials
-        2. Find your OAuth 2.0 Client ID used for this app
-        3. Go to the "OAuth consent screen" tab
-        4. Click "PUBLISH APP" if not already published
-        5. Go to https://accounts.google.com/o/oauth2/v2/auth?
-           client_id={client_id}
-           &redirect_uri=https://developers.google.com/oauthplayground
-           &scope=https://www.googleapis.com/auth/gmail.readonly
-           &access_type=offline
-           &response_type=code
+        client_id = self.CLIENT_CONFIG['web']['client_id']
+        client_secret = self.CLIENT_CONFIG['web']['client_secret']
         
-        Copy and paste this complete URL in your browser. After authenticating, you'll get 
-        an authorization code that you can paste back in the app.
-        """.format(
-            client_id=self.CLIENT_CONFIG['web']['client_id']
-        ).replace('\n           ', '')
+        return f"""
+        1. Go to Google's OAuth 2.0 Playground: https://developers.google.com/oauthplayground/
+        
+        2. Click the gear icon ⚙️ in the top-right corner
+        
+        3. Check "Use your own OAuth credentials"
+        
+        4. Enter these credentials:
+           - OAuth Client ID: {client_id}
+           - OAuth Client Secret: {client_secret}
+        
+        5. Close the settings panel
+        
+        6. In the left panel under "Step 1", find "Gmail API v1" and select:
+           - https://www.googleapis.com/auth/gmail.readonly
+        
+        7. Click "Authorize APIs" and proceed with Google authentication
+        
+        8. On the "Step 2" screen, click "Exchange authorization code for tokens"
+        
+        9. In "Step 3", look for "access_token" in the response
+        
+        10. Copy the entire access token (the long string after "access_token":) 
+            and paste it back in the app
+        """
     
     def authorize_with_code(self, code):
         """

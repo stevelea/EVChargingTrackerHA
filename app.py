@@ -65,21 +65,42 @@ with st.sidebar:
             # Display the instructions provided by the Gmail client
             st.code(st.session_state.auth_instructions, language=None)
             
-            # Provide a field for the user to enter the authorization code
-            auth_code = st.text_input("Enter the authorization code you received:", key="auth_code")
+            # Provide a field for the user to enter the access token directly
+            access_token = st.text_input("Enter the access_token from Step 3:", key="access_token")
             
-            if st.button("Submit Authorization Code"):
-                if auth_code:
+            if st.button("Submit Access Token"):
+                if access_token:
                     try:
-                        # Use the code to get credentials
-                        if st.session_state.gmail_client.authorize_with_code(auth_code):
-                            st.session_state.authenticated = True
-                            st.success("Authentication successful!")
-                            st.rerun()
+                        # Create credentials directly with the access token
+                        from google.oauth2.credentials import Credentials
+                        
+                        # Get client details
+                        client_id = st.session_state.gmail_client.CLIENT_CONFIG['web']['client_id']
+                        client_secret = st.session_state.gmail_client.CLIENT_CONFIG['web']['client_secret']
+                        
+                        # Create credentials
+                        credentials = Credentials(
+                            access_token,
+                            client_id=client_id,
+                            client_secret=client_secret,
+                            token_uri="https://oauth2.googleapis.com/token",
+                            scopes=['https://www.googleapis.com/auth/gmail.readonly']
+                        )
+                        
+                        # Set credentials and build service
+                        st.session_state.gmail_client.creds = credentials
+                        
+                        # Initialize the Gmail API service
+                        from googleapiclient.discovery import build
+                        st.session_state.gmail_client.service = build('gmail', 'v1', credentials=credentials)
+                        
+                        st.session_state.authenticated = True
+                        st.success("Authentication successful!")
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Authentication error: {str(e)}")
                 else:
-                    st.error("Please enter the authorization code you received from Google")
+                    st.error("Please enter the access token from the OAuth Playground")
     else:
         st.success("Authenticated with Gmail")
         if st.button("Logout"):
