@@ -2,6 +2,46 @@ from datetime import datetime, timedelta
 import pandas as pd
 import io
 import re
+import os
+import json
+
+# Paths for saving credentials
+CREDENTIALS_FILE = "credentials.json"
+
+def save_credentials(email_address):
+    """
+    Save email address to a file for future use
+    
+    Args:
+        email_address: User's Gmail address to save
+    """
+    try:
+        data = {"email_address": email_address}
+        
+        # Save to file
+        with open(CREDENTIALS_FILE, "w") as f:
+            json.dump(data, f)
+            
+        return True
+    except Exception as e:
+        print(f"Error saving credentials: {str(e)}")
+        return False
+
+def load_credentials():
+    """
+    Load saved email address from file
+    
+    Returns:
+        Dictionary with email_address key or None if not found
+    """
+    try:
+        if os.path.exists(CREDENTIALS_FILE):
+            with open(CREDENTIALS_FILE, "r") as f:
+                return json.load(f)
+        return None
+    except Exception as e:
+        print(f"Error loading credentials: {str(e)}")
+        return None
 
 def get_date_range(start_date, end_date):
     """

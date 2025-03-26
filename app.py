@@ -9,7 +9,7 @@ import urllib.parse
 from gmail_api import GmailClient
 from data_parser import parse_charging_emails, clean_charging_data
 from data_visualizer import create_visualizations
-from utils import get_date_range, export_data_as_csv
+from utils import get_date_range, export_data_as_csv, save_credentials, load_credentials
 
 # Set page configuration
 st.set_page_config(
@@ -58,6 +58,16 @@ with st.sidebar:
     if not st.session_state.authenticated:
         st.info("Please authenticate with your Gmail account to access your charging receipts.")
         
+        # Load saved credentials if available
+        if 'email_loaded' not in st.session_state:
+            credentials = load_credentials()
+            if credentials and 'email_address' in credentials:
+                st.session_state.saved_email = credentials['email_address']
+                st.session_state.email_loaded = True
+            else:
+                st.session_state.saved_email = ""
+                st.session_state.email_loaded = True
+        
         # Create two step authentication process
         if 'auth_step' not in st.session_state:
             st.session_state.auth_step = 1
@@ -82,8 +92,12 @@ with st.sidebar:
             st.code(st.session_state.auth_instructions, language=None)
             
             # Provide fields for the user to enter their email and app password
-            email_address = st.text_input("Enter your Gmail address:", key="email_address")
+            # Pre-fill with saved email if available
+            email_address = st.text_input("Enter your Gmail address:", 
+                                          key="email_address", 
+                                          value=st.session_state.saved_email)
             app_password = st.text_input("Enter the App Password:", key="app_password", type="password")
+            save_email = st.checkbox("Remember my email address", value=True)
             
             if st.button("Connect to Gmail"):
                 if email_address and app_password:
@@ -91,6 +105,11 @@ with st.sidebar:
                         # Authenticate with the provided credentials
                         if st.session_state.gmail_client.authenticate(email_address, app_password):
                             st.session_state.authenticated = True
+                            
+                            # Save credentials if requested
+                            if save_email:
+                                save_credentials(email_address)
+                                
                             st.success("Authentication successful!")
                             st.rerun()
                     except Exception as e:
