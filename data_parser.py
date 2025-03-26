@@ -90,6 +90,22 @@ def parse_charging_emails(emails):
         ]
     }
     
+    # Specific patterns for Ampol AmpCharge receipts
+    ampol_patterns = {
+        'location': [
+            r'Location:\s*(.+?)(?:\n|\r|$)',
+            r'Charging station:\s*(.+?)(?:\n|\r|$)',
+        ],
+        'total_kwh': [
+            r'Energy delivered:\s*([\d.]+)\s*kWh',
+            r'Energy consumed:\s*([\d.]+)\s*kWh',
+        ],
+        'total_cost': [
+            r'Total amount:\s*\$?([\d.]+)',
+            r'Amount:\s*\$?([\d.]+)',
+        ]
+    }
+    
     for email in emails:
         try:
             # Skip emails without bodies
@@ -97,12 +113,13 @@ def parse_charging_emails(emails):
                 continue
                 
             email_body = email['body']
+            email_subject = email.get('subject', '')
             
             # Initialize data dictionary for this email
             data = {
                 'email_id': email['id'],
                 'email_date': email.get('date'),
-                'email_subject': email.get('subject', ''),
+                'email_subject': email_subject,
                 'date': None,
                 'time': None,
                 'location': None,
@@ -113,13 +130,36 @@ def parse_charging_emails(emails):
                 'total_cost': None
             }
             
-            # Try to extract each piece of data using our patterns
-            for field, field_patterns in patterns.items():
-                for pattern in field_patterns:
-                    match = re.search(pattern, email_body, re.IGNORECASE)
-                    if match:
-                        data[field] = match.group(1).strip()
-                        break
+            # Check if this is an Ampol AmpCharge receipt
+            is_ampol = 'ampol' in email_subject.lower() or 'ampcharge' in email_subject.lower()
+            
+            # Use Ampol specific patterns if this is an Ampol email
+            if is_ampol:
+                st.debug("Parsing Ampol AmpCharge receipt")
+                # Try to extract each piece of data using Ampol-specific patterns
+                for field, field_patterns in ampol_patterns.items():
+                    for pattern in field_patterns:
+                        match = re.search(pattern, email_body, re.IGNORECASE)
+                        if match:
+                            data[field] = match.group(1).strip()
+                            break
+                
+                # Use regular patterns for fields not in ampol_patterns
+                for field, field_patterns in patterns.items():
+                    if field not in ampol_patterns or data[field] is None:
+                        for pattern in field_patterns:
+                            match = re.search(pattern, email_body, re.IGNORECASE)
+                            if match:
+                                data[field] = match.group(1).strip()
+                                break
+            else:
+                # For non-Ampol emails, use the regular patterns
+                for field, field_patterns in patterns.items():
+                    for pattern in field_patterns:
+                        match = re.search(pattern, email_body, re.IGNORECASE)
+                        if match:
+                            data[field] = match.group(1).strip()
+                            break
             
             # Process the extracted data
             
@@ -289,12 +329,24 @@ def clean_charging_data(charging_data):
     if 'total_kwh' in df.columns and 'cost_per_kwh' in df.columns and 'total_cost' in df.columns:
         # Calculate missing total_cost values
         for idx, row in df.iterrows():
-            # If we have energy and rate but no cost, calculate it
-            if pd.isna(row['total_cost']) and not pd.isna(row['total_kwh']) and not pd.isna(row['cost_per_kwh']):
+            # Determine if this is an Ampol receipt
+            is_ampol = False
+            if 'email_subject' in df.columns:
+                email_subject = str(row.get('email_subject', '')).lower()
+                is_ampol = 'ampol' in email_subject or 'ampcharge' in email_subject
+            
+            # For Ampol receipts, always calculate cost_per_kwh from total_cost and total_kwh
+            if is_ampol and not pd.isna(row['total_cost']) and not pd.isna(row['total_kwh']) and row['total_kwh'] > 0:
+                df.at[idx, 'cost_per_kwh'] = row['total_cost'] / row['total_kwh']
+                st.info(f"Calculated cost per kWh for Ampol AmpCharge: ${df.at[idx, 'cost_per_kwh']:.2f}")
+            
+            # For other receipts or if we're missing values, use standard calculations
+            elif pd.isna(row['total_cost']) and not pd.isna(row['total_kwh']) and not pd.isna(row['cost_per_kwh']):
+                # If we have energy and rate but no cost, calculate it
                 df.at[idx, 'total_cost'] = row['total_kwh'] * row['cost_per_kwh']
             
-            # If we have total cost and energy but no rate, calculate it
             elif pd.isna(row['cost_per_kwh']) and not pd.isna(row['total_kwh']) and not pd.isna(row['total_cost']) and row['total_kwh'] > 0:
+                # If we have total cost and energy but no rate, calculate it
                 df.at[idx, 'cost_per_kwh'] = row['total_cost'] / row['total_kwh']
 
         # Some standard defaults if values are still missing
