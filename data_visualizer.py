@@ -79,13 +79,14 @@ def create_visualizations(data):
         size=peak_kw_values,  # Pass as explicit list 
         color='cost_per_kwh',
         hover_name='location',
-        hover_data=['total_cost', 'peak_kw', 'duration'],
+        hover_data=['provider', 'total_cost', 'peak_kw', 'duration'],
         title='Charging Sessions Over Time',
         labels={
             'date': 'Date',
             'total_kwh': 'Energy Delivered (kWh)',
             'peak_kw': 'Peak Power (kW)',
-            'cost_per_kwh': 'Cost per kWh ($)'
+            'cost_per_kwh': 'Cost per kWh ($)',
+            'provider': 'Provider'
         },
         color_continuous_scale='Viridis'
     )
@@ -228,15 +229,16 @@ def create_visualizations(data):
         plot_data,  # Use pre-converted data
         x='date',
         y='cost_per_kwh',
-        color='location',
+        color='provider',  # Changed from location to provider
         size=total_kwh_values,  # Pass as explicit list
-        title='Cost per kWh Over Time',
+        title='Cost per kWh Over Time by Provider',
         labels={
             'date': 'Date',
             'cost_per_kwh': 'Cost per kWh ($)',
-            'location': 'Location',
+            'provider': 'Provider',
             'total_kwh': 'Energy Delivered (kWh)'
-        }
+        },
+        hover_data=['location', 'total_cost']
     )
     
     figures['cost_per_kwh'].update_layout(
@@ -255,13 +257,14 @@ def create_visualizations(data):
         size=total_cost_values,  # Pass as explicit list
         color='cost_per_kwh',
         hover_name='location',
-        hover_data=['date', 'duration'],
+        hover_data=['provider', 'date', 'duration'],
         title='Charging Efficiency Analysis',
         labels={
             'total_kwh': 'Energy Delivered (kWh)',
             'peak_kw': 'Peak Power (kW)',
             'total_cost': 'Total Cost ($)',
-            'cost_per_kwh': 'Cost per kWh ($)'
+            'cost_per_kwh': 'Cost per kWh ($)',
+            'provider': 'Provider'
         },
         color_continuous_scale='Viridis'
     )

@@ -123,6 +123,7 @@ def parse_charging_emails(emails):
                 'date': None,
                 'time': None,
                 'location': None,
+                'provider': None,  # New field for charging provider
                 'total_kwh': None,
                 'peak_kw': None,
                 'duration': None,
@@ -132,6 +133,28 @@ def parse_charging_emails(emails):
             
             # Check if this is an Ampol AmpCharge receipt
             is_ampol = 'ampol' in email_subject.lower() or 'ampcharge' in email_subject.lower()
+            
+            # Detect and set the provider based on email subject and body
+            if is_ampol:
+                data['provider'] = 'Ampol AmpCharge'
+            elif 'evie' in email_subject.lower() or 'evie' in email_body.lower():
+                data['provider'] = 'Evie Networks'
+            elif 'chargefox' in email_subject.lower() or 'chargefox' in email_body.lower():
+                data['provider'] = 'Chargefox'
+            elif 'chargepoint' in email_subject.lower() or 'chargepoint' in email_body.lower():
+                data['provider'] = 'ChargePoint'
+            elif 'tesla' in email_subject.lower() or 'tesla' in email_body.lower():
+                data['provider'] = 'Tesla'
+            elif 'electrify' in email_subject.lower() or 'electrify' in email_body.lower():
+                data['provider'] = 'Electrify America'
+            elif 'jolt' in email_subject.lower() or 'jolt' in email_body.lower():
+                data['provider'] = 'Jolt'
+            elif 'evup' in email_subject.lower() or 'evup' in email_body.lower():
+                data['provider'] = 'EVUP'
+            else:
+                # Try to extract from location or station info if available
+                # Default to "Unknown" if we can't identify the provider
+                data['provider'] = 'Unknown'
             
             # Use Ampol specific patterns if this is an Ampol email
             if is_ampol:

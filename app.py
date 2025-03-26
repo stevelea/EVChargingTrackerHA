@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import urllib.parse
 
 from gmail_api import GmailClient
+from tesla_api import TeslaApiClient
 from data_parser import parse_charging_emails, clean_charging_data
 from data_visualizer import create_visualizations
 from utils import get_date_range, export_data_as_csv, save_credentials, load_credentials
@@ -27,6 +28,10 @@ if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'gmail_client' not in st.session_state:
     st.session_state.gmail_client = GmailClient()
+if 'tesla_client' not in st.session_state:
+    st.session_state.tesla_client = TeslaApiClient()
+if 'tesla_authenticated' not in st.session_state:
+    st.session_state.tesla_authenticated = False
 
 # Initialize dashboard preferences
 if 'dashboard_preferences' not in st.session_state:
@@ -123,6 +128,39 @@ with st.sidebar:
             st.session_state.auth_step = 1
             st.session_state.gmail_client = GmailClient()  # Reset the client
             st.session_state.charging_data = None
+            st.rerun()
+    
+    # Tesla API Authentication section
+    if st.session_state.authenticated and not st.session_state.tesla_authenticated:
+        st.subheader("Tesla API Authentication (Optional)")
+        st.info("Connect to Tesla API to retrieve charging data for non-Tesla vehicles using Tesla Superchargers.")
+        
+        # Show Tesla authentication form
+        show_tesla_auth = st.checkbox("Use Tesla API", value=False, key="show_tesla_auth")
+        
+        if show_tesla_auth:
+            # Direct token authentication
+            tesla_access_token = st.text_input("Tesla API Access Token:", type="password", key="tesla_access_token")
+            tesla_refresh_token = st.text_input("Tesla API Refresh Token:", type="password", key="tesla_refresh_token")
+            
+            if st.button("Connect to Tesla API"):
+                if tesla_access_token and tesla_refresh_token:
+                    try:
+                        if st.session_state.tesla_client.set_tokens(tesla_access_token, tesla_refresh_token):
+                            st.session_state.tesla_authenticated = True
+                            st.success("Tesla API authentication successful!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Tesla API authentication error: {str(e)}")
+                else:
+                    st.error("Please enter both the Tesla API Access Token and Refresh Token")
+    
+    # Show Tesla status if authenticated
+    if st.session_state.tesla_authenticated:
+        st.success("Connected to Tesla API")
+        if st.button("Disconnect Tesla API"):
+            st.session_state.tesla_authenticated = False
+            st.session_state.tesla_client = TeslaApiClient()  # Reset the client
             st.rerun()
     
     # Data retrieval section (only show if authenticated)
