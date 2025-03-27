@@ -56,34 +56,53 @@ def generate_record_id(record):
         else:
             id_fields.append(str(record['date']))
     
-    # For EVCC data, include time field if available to make it more unique
-    if record.get('source') == 'EVCC CSV' and record.get('time'):
-        id_fields.append(str(record['time']))
-    
-    # Add identifying fields - for EVCC use all numeric fields to ensure uniqueness
+    # Different handling based on source to ensure uniqueness
     if record.get('source') == 'EVCC CSV':
-        for field in ['provider', 'location', 'total_kwh', 'duration', 'vehicle', 'cost_per_kwh', 'total_cost']:
+        # For EVCC data, use precise timestamp fields
+        if record.get('time'):
+            id_fields.append(str(record['time']))
+        
+        if record.get('end_date'):
+            id_fields.append(str(record['end_date']))
+            
+        # Include exact energy values for EVCC for better uniqueness
+        for field in ['total_kwh', 'peak_kw', 'duration', 'cost_per_kwh', 'total_cost']:
             if record.get(field):
-                id_fields.append(str(record[field]))
-    else:
-        # For other sources, use standard fields
+                id_fields.append(f"{field}:{record[field]}")
+                
+        # Include generic fields with prefixes to prevent field value collisions 
+        for field in ['provider', 'location', 'vehicle']:
+            if record.get(field):
+                id_fields.append(f"{field}:{record[field]}")
+                
+    elif record.get('source') == 'PDF Upload':
+        # For PDF data
+        if record.get('pdf_filename'):
+            id_fields.append(str(record['pdf_filename']))
+            
+        # Include PDF-specific fields
         for field in ['provider', 'location', 'total_kwh', 'total_cost']:
             if record.get(field):
-                id_fields.append(str(record[field]))
-    
-    # Include source if available
-    if record.get('source'):
-        id_fields.append(str(record['source']))
-    
-    # If we have email_id or pdf_filename, use that too
-    if record.get('email_id'):
+                id_fields.append(f"{field}:{record[field]}")
+                
+    elif record.get('email_id'):
+        # For email-based data
         id_fields.append(str(record['email_id']))
-    elif record.get('pdf_filename'):
-        id_fields.append(str(record['pdf_filename']))
+        
+        # Include email-specific fields
+        for field in ['provider', 'location', 'total_kwh', 'total_cost']:
+            if record.get(field):
+                id_fields.append(f"{field}:{record[field]}")
     
-    # For EVCC, also include finished timestamp if available for more uniqueness
-    if record.get('source') == 'EVCC CSV' and record.get('end_date'):
-        id_fields.append(str(record['end_date']))
+    else:
+        # For other/generic sources, use standard fields
+        for field in ['provider', 'location', 'total_kwh', 'peak_kw', 'duration', 'total_cost']:
+            if record.get(field):
+                id_fields.append(f"{field}:{record[field]}")
+    
+    # Always include source if available
+    if record.get('source'):
+        id_fields.append(f"source:{record['source']}")
         
     # Create a hash from these fields
     record_str = '|'.join(id_fields)

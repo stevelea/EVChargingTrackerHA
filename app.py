@@ -14,7 +14,7 @@ from data_visualizer import create_visualizations
 from data_storage import (
     load_charging_data, save_charging_data, merge_charging_data, 
     convert_to_dataframe, filter_data_by_date_range, delete_charging_data,
-    filter_records_by_criteria, delete_selected_records
+    filter_records_by_criteria, delete_selected_records, generate_record_id
 )
 from utils import get_date_range, export_data_as_csv, save_credentials, load_credentials
 from location_mapper import display_charging_map
@@ -302,7 +302,7 @@ with st.sidebar:
                 st.info(f"You have {len(stored_data)} charging sessions stored in the database.")
                 
                 # Data Management Tabs
-                data_mgmt_tabs = st.tabs(["Selective Delete", "Delete All"])
+                data_mgmt_tabs = st.tabs(["Selective Delete", "Clean Database", "Delete All"])
                 
                 # Selective Delete Tab
                 with data_mgmt_tabs[0]:
@@ -463,8 +463,69 @@ with st.sidebar:
                     else:
                         st.warning("No records found matching your criteria.")
                 
-                # Delete All Tab
+                # Clean Database Tab
                 with data_mgmt_tabs[1]:
+                    st.subheader("Clean Database")
+                    st.info("This will deduplicate your data and remove any duplicate records, especially from EVCC CSV imports.")
+                    
+                    # Add options for cleaning
+                    st.write("Cleaning Options:")
+                    clean_evcc_only = st.checkbox(
+                        "Clean only EVCC data", 
+                        value=True,
+                        help="When checked, only EVCC CSV data will be deduplicated. Otherwise, all data sources will be cleaned."
+                    )
+                    
+                    # Option to run cleaning process
+                    if st.button("Clean Database", type="primary"):
+                        with st.spinner("Cleaning database..."):
+                            # Load existing data
+                            existing_data = load_charging_data(st.session_state.current_user_email)
+                            
+                            if not existing_data:
+                                st.warning("No data to clean.")
+                            else:
+                                # Count original records
+                                original_count = len(existing_data)
+                                
+                                # Initialize cleaned data list with seen_ids to track duplicates
+                                cleaned_data = []
+                                seen_ids = set()
+                                
+                                # Filter by source if EVCC only option is selected
+                                for record in existing_data:
+                                    # Skip record if it's EVCC and we're cleaning EVCC only
+                                    # or if we're cleaning all data
+                                    if (clean_evcc_only and record.get('source') == 'EVCC CSV') or not clean_evcc_only:
+                                        # Generate a new ID based on current algorithm
+                                        record_id = generate_record_id(record)
+                                        
+                                        # Only keep the record if we haven't seen this ID before
+                                        if record_id not in seen_ids:
+                                            # Force update the ID
+                                            record['id'] = record_id
+                                            cleaned_data.append(record)
+                                            seen_ids.add(record_id)
+                                    else:
+                                        # Keep non-EVCC records as they are if EVCC only option is selected
+                                        cleaned_data.append(record)
+                                
+                                # Save the cleaned data
+                                save_charging_data(cleaned_data, st.session_state.current_user_email)
+                                
+                                # Report results
+                                removed_count = original_count - len(cleaned_data)
+                                if removed_count > 0:
+                                    st.success(f"Successfully removed {removed_count} duplicate records.")
+                                    
+                                    # Update main data
+                                    st.session_state.charging_data = clean_charging_data(cleaned_data)
+                                    st.rerun()
+                                else:
+                                    st.info("No duplicate records found.")
+                
+                # Delete All Tab
+                with data_mgmt_tabs[2]:
                     st.subheader("Delete All Data")
                     st.warning("This will permanently delete all your stored charging data. This action cannot be undone.")
                     
@@ -504,12 +565,15 @@ with st.sidebar:
                         evcc_data = parse_evcc_csv(uploaded_file, default_cost_per_kwh=evcc_cost_per_kwh)
                         
                         if evcc_data:
+                            # Add a source marker to identify EVCC data
+                            for item in evcc_data:
+                                item['source'] = 'EVCC CSV'
+                                # Ensure each EVCC record has a proper ID
+                                if 'id' not in item:
+                                    item['id'] = generate_record_id(item)
+                            
                             # If replace_evcc_data is checked, mark the data for replacement
                             if 'replace_evcc_data' in locals() and replace_evcc_data:
-                                # Add a source marker to identify EVCC data
-                                for item in evcc_data:
-                                    item['source'] = 'EVCC CSV'
-                                
                                 all_charging_data = evcc_data
                                 st.session_state.replace_evcc_data = True
                                 st.success(f"Successfully loaded {len(evcc_data)} charging sessions from EVCC CSV. Existing EVCC data will be replaced.")
