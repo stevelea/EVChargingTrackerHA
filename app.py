@@ -100,6 +100,7 @@ if 'dashboard_preferences' not in st.session_state:
             'odometer_time_series': {'visible': True, 'order': 13, 'name': 'Odometer Readings Over Time'},
             'energy_efficiency': {'visible': True, 'order': 14, 'name': 'Energy Efficiency (kWh per km)'},
             'cost_per_km': {'visible': True, 'order': 15, 'name': 'Cost Efficiency ($ per km)'},
+            'map_view': {'visible': True, 'order': 16, 'name': 'Location Map'},
         },
         'layout': 'tabs',  # 'tabs' or 'grid'
         'grid_columns': 2   # Number of columns if using grid layout
@@ -1296,6 +1297,7 @@ with st.sidebar:
                         'cost_time_series': {'visible': True, 'order': 5, 'name': 'Cost Over Time'},
                         'cost_per_kwh': {'visible': True, 'order': 6, 'name': 'Cost per kWh Trends'},
                         'cost_by_location': {'visible': True, 'order': 7, 'name': 'Cost by Location'},
+                        'map_view': {'visible': True, 'order': 8, 'name': 'Location Map'},
                     },
                     'layout': 'tabs',
                     'grid_columns': 2
@@ -1498,6 +1500,7 @@ if st.session_state.authenticated:
                 'cost_analysis': {'name': 'Cost Analysis', 'charts': ['cost_time_series', 'cost_per_kwh', 'cost_by_location']},
                 'provider_analysis': {'name': 'Provider Comparison', 'charts': ['provider_cost_comparison', 'provider_kwh_comparison']},
                 'predictive_analysis': {'name': 'Future Predictions', 'charts': ['monthly_cost_forecast', 'provider_trend_prediction', 'usage_prediction']},
+                'map_view': {'name': 'Location Map', 'charts': []},
                 'raw_data': {'name': 'Raw Data', 'charts': []}
             }
             
@@ -1632,6 +1635,10 @@ if st.session_state.authenticated:
                                 else:
                                     st.info("Not enough data for usage prediction. Continue collecting data for at least 10 charging sessions.")
                     
+                    elif group['name'] == 'Location Map':
+                        # Display the map and location statistics
+                        display_charging_map(data)
+                        
                     elif group['name'] == 'Raw Data':
                         st.subheader("Raw Data")
                         
@@ -1713,6 +1720,12 @@ if st.session_state.authenticated:
                         with columns[i]:
                             st.subheader(viz['name'])
                             st.plotly_chart(charts[viz['id']], use_container_width=True)
+            
+            # Add Map View section
+            st.subheader("Charging Station Map")
+            
+            # Display the interactive map
+            display_charging_map(data)
             
             # Add Raw Data section at the end
             st.subheader("Raw Data")
