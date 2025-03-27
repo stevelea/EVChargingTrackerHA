@@ -111,19 +111,24 @@ def create_visualizations(data):
     peak_kw_values = None
     if 'peak_kw' in data.columns:
         try:
-            # Try to convert to numeric values with a default for missing data
-            peak_kw_values = []
-            for val in data['peak_kw']:
-                try:
-                    if pd.notnull(val) and val != 0:
-                        peak_kw_values.append(float(val))
-                    else:
-                        peak_kw_values.append(5.0)  # Default size
-                except:
-                    peak_kw_values.append(5.0)  # Default for unconvertible values
+            # First ensure it's a numeric series, coercing invalid values to NaN
+            numeric_peak_kw = pd.to_numeric(data['peak_kw'], errors='coerce')
+            
+            # Then replace NaN values with a default
+            numeric_peak_kw = numeric_peak_kw.fillna(5.0)
+            
+            # Replace 0 values with the default
+            numeric_peak_kw = numeric_peak_kw.replace(0, 5.0)
+            
+            # Convert to a Python list (not a pandas Series)
+            peak_kw_values = numeric_peak_kw.tolist()
+            
+            # Verify each value is actually a float (or an int)
+            peak_kw_values = [float(val) for val in peak_kw_values]
         except Exception as e:
             print(f"Error converting peak_kw: {str(e)}")
-            peak_kw_values = None
+            # If conversion fails, create a list of fixed values
+            peak_kw_values = [5.0] * len(data)
     
     # Create scatter plot with or without variable size
     if peak_kw_values:

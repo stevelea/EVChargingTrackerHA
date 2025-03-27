@@ -1129,47 +1129,38 @@ with st.sidebar:
             # Process combined data if any was retrieved
             if all_charging_data:
                 with st.spinner("Processing charging data..."):
+                    # Always load existing data first
+                    existing_data = load_charging_data(st.session_state.current_user_email)
+                    
                     # Check if incremental updates are enabled and if we have existing data
-                    if 'incremental_update' in locals() and incremental_update:
-                        # Load existing data
-                        existing_data = load_charging_data(st.session_state.current_user_email)
+                    if ('incremental_update' in locals() and incremental_update) and existing_data:
+                        # Check if we're replacing EVCC data
+                        if hasattr(st.session_state, 'replace_evcc_data') and st.session_state.replace_evcc_data:
+                            # Remove all existing EVCC data first
+                            existing_data = [item for item in existing_data if item.get('source') != 'EVCC CSV']
+                            st.info("Removing existing EVCC data before merging.")
+                            # Reset the flag
+                            st.session_state.replace_evcc_data = False
+                            
+                        # Merge new data with existing data (avoiding duplicates)
+                        combined_data = merge_charging_data(existing_data, all_charging_data)
+                        st.info(f"Merged {len(all_charging_data)} new charging sessions with {len(existing_data)} existing sessions.")
                         
-                        if existing_data:
-                            # Check if we're replacing EVCC data
-                            if hasattr(st.session_state, 'replace_evcc_data') and st.session_state.replace_evcc_data:
-                                # Remove all existing EVCC data first
-                                existing_data = [item for item in existing_data if item.get('source') != 'EVCC CSV']
-                                st.info("Removing existing EVCC data before merging.")
-                                # Reset the flag
-                                st.session_state.replace_evcc_data = False
-                                
-                            # Merge new data with existing data (avoiding duplicates)
-                            combined_data = merge_charging_data(existing_data, all_charging_data)
-                            st.info(f"Merged {len(all_charging_data)} new charging sessions with {len(existing_data)} existing sessions.")
-                            
-                            # Update session with incremental count
-                            new_sessions_count = len(combined_data) - len(existing_data)
-                            if new_sessions_count > 0:
-                                st.success(f"Added {new_sessions_count} new charging sessions.")
-                            else:
-                                st.info("No new charging sessions found.")
-                                
-                            # Clean and process the combined data
-                            df = clean_charging_data(combined_data)
-                            
-                            # Save the updated data to persistent storage
-                            save_charging_data(combined_data, st.session_state.current_user_email)
+                        # Update session with incremental count
+                        new_sessions_count = len(combined_data) - len(existing_data)
+                        if new_sessions_count > 0:
+                            st.success(f"Added {new_sessions_count} new charging sessions.")
                         else:
-                            # No existing data, just process and save the new data
-                            df = clean_charging_data(all_charging_data)
-                            save_charging_data(all_charging_data, st.session_state.current_user_email)
-                            st.success(f"Saved {len(all_charging_data)} charging sessions to database.")
-                    else:
-                        # Clean and process the new data
-                        df = clean_charging_data(all_charging_data)
+                            st.info("No new charging sessions found.")
+                            
+                        # Clean and process the combined data
+                        df = clean_charging_data(combined_data)
                         
-                        # Save the new data to persistent storage 
-                        # (will overwrite existing data when incremental_update is False)
+                        # Save the updated data to persistent storage
+                        save_charging_data(combined_data, st.session_state.current_user_email)
+                    else:
+                        # No existing data, just process and save the new data
+                        df = clean_charging_data(all_charging_data)
                         save_charging_data(all_charging_data, st.session_state.current_user_email)
                         st.success(f"Saved {len(all_charging_data)} charging sessions to database.")
                     
@@ -1350,10 +1341,10 @@ if st.session_state.authenticated:
                         
                         if email_charging_data:
                             # Process and store the data
-                            if incremental_update and st.session_state.charging_data is not None:
-                                # Get existing data
-                                existing_data = load_charging_data(st.session_state.current_user_email)
-                                
+                            # Always load existing data from the database first
+                            existing_data = load_charging_data(st.session_state.current_user_email)
+                            
+                            if incremental_update and (existing_data or st.session_state.charging_data is not None):
                                 # Merge with new data
                                 combined_data = merge_charging_data(existing_data, email_charging_data)
                                 

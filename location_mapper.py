@@ -128,15 +128,17 @@ def create_charging_map(df, zoom_start=10):
         # Generate PlugShare link for this location
         plugshare_url = get_plugshare_link(row['location'], row['latitude'], row['longitude'])
         
-        # Create popup content
+        # Create popup content with proper HTML formatting
         popup_content = f"""
-        <b>Location:</b> {row['location']}<br>
-        <b>Date:</b> {row['date'].strftime('%Y-%m-%d')}<br>
-        <b>Provider:</b> {row['provider']}<br>
-        <b>Energy:</b> {row['total_kwh']:.2f} kWh<br>
-        <b>Cost:</b> ${row['total_cost']:.2f}<br>
-        <br>
-        <a href="{plugshare_url}" target="_blank">View on PlugShare</a>
+        <div style="font-family: Arial, sans-serif; padding: 5px;">
+            <h4 style="margin: 0 0 5px 0;">{row['location']}</h4>
+            <b>Date:</b> {row['date'].strftime('%Y-%m-%d')}<br>
+            <b>Provider:</b> {row['provider']}<br>
+            <b>Energy:</b> {row['total_kwh']:.2f} kWh<br>
+            <b>Cost:</b> ${row['total_cost']:.2f}<br>
+            <br>
+            <a href="{plugshare_url}" target="_blank" style="background-color: #4CAF50; color: white; padding: 5px 10px; text-decoration: none; border-radius: 4px; display: inline-block;">View on PlugShare</a>
+        </div>
         """
         
         # Create marker
@@ -247,15 +249,16 @@ def display_charging_map(df):
         location_stats['Total Cost ($)'] = location_stats['Total Cost ($)'].round(2)
         location_stats['Average Cost per kWh ($)'] = location_stats['Average Cost per kWh ($)'].round(2)
         
-        # Add PlugShare links
+        # Add PlugShare links with HTML formatting for better visibility
         location_stats['PlugShare Link'] = location_stats.apply(
-            lambda row: f"[View on PlugShare]({get_plugshare_link(row['Location'], row['Latitude'], row['Longitude'])})", 
+            lambda row: f"<a href='{get_plugshare_link(row['Location'], row['Latitude'], row['Longitude'])}' target='_blank'><span style='background-color: #4CAF50; color: white; padding: 5px 8px; border-radius: 4px;'>View on PlugShare</span></a>", 
             axis=1
         )
         
         # Drop coordinate columns before display
         display_stats = location_stats.drop(columns=['Latitude', 'Longitude'])
         
-        st.dataframe(display_stats, use_container_width=True)
+        # Tell Streamlit to render the HTML in the PlugShare Link column
+        st.dataframe(display_stats, use_container_width=True, unsafe_allow_html=True)
     else:
         st.info("Add specific location names like 'Sydney CBD' or 'Brisbane Airport' to view them on the map.")
