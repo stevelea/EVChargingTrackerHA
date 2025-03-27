@@ -4,9 +4,38 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 import hashlib
+import importlib
 
 # Define the file path for storing data
 DATA_DIR = "data"
+
+# Check if we're running on Replit
+try:
+    # Try to import the replit module
+    from replit import db as replit_db
+    ON_REPLIT = True
+    st.sidebar.markdown("🔁 **Replit persistence enabled**")
+except ImportError:
+    # If import fails, we're not on Replit
+    ON_REPLIT = False
+
+def get_user_data_key(email_address=None):
+    """
+    Get the database key for storing user data in Replit DB
+    
+    Args:
+        email_address: User's email address, or None for the default key
+        
+    Returns:
+        String key for the user's data in Replit DB
+    """
+    if email_address:
+        # Create a safe key from the email address
+        safe_email = email_address.replace("@", "_at_").replace(".", "_dot_")
+        return f"charging_data_{safe_email}"
+    else:
+        # Default key for backward compatibility
+        return "charging_data"
 
 def get_user_data_file(email_address=None):
     """
@@ -116,11 +145,6 @@ def save_charging_data(data_list, email_address=None):
         data_list: List of dictionaries containing charging data
         email_address: Optional email address to save data for a specific user
     """
-    ensure_data_directory()
-    
-    # Get the appropriate file path for this user
-    file_path = get_user_data_file(email_address)
-    
     # Convert any datetime objects to strings
     serializable_data = []
     for record in data_list:
@@ -154,6 +178,32 @@ def save_charging_data(data_list, email_address=None):
             
         serializable_data.append(record_copy)
     
+    # Use Replit DB if we're on Replit, otherwise use file storage
+    if ON_REPLIT:
+        try:
+            # Get the appropriate DB key for this user
+            db_key = get_user_data_key(email_address)
+            
+            # Store data as JSON string in Replit DB
+            replit_db[db_key] = json.dumps(serializable_data, default=str)
+            
+            # Log success
+            st.sidebar.info("📊 Data saved to Replit DB", icon="✅")
+        except Exception as e:
+            st.error(f"Error saving to Replit DB: {str(e)}")
+            # Fall back to file storage
+            save_to_file(serializable_data, email_address)
+    else:
+        # Use regular file storage
+        save_to_file(serializable_data, email_address)
+
+def save_to_file(serializable_data, email_address=None):
+    """Helper function to save data to a file"""
+    ensure_data_directory()
+    
+    # Get the appropriate file path for this user
+    file_path = get_user_data_file(email_address)
+    
     # Write to file using a custom JSON encoder for any remaining datetime objects
     with open(file_path, 'w') as f:
         json.dump(serializable_data, f, indent=2, default=str)
@@ -168,6 +218,92 @@ def load_charging_data(email_address=None):
     Returns:
         List of dictionaries containing charging data, or empty list if none found
     """
+    # Use Replit DB if we're on Replit, otherwise use file storage
+    if ON_REPLIT:
+        try:
+            # Get the appropriate DB key for this user
+            db_key = get_user_data_key(email_address)
+            
+            # Check if data exists in Replit DB
+            if db_key in replit_db:
+                # Load data from Replit DB
+                data_json = replit_db[db_key]
+                data = json.loads(data_json)
+                
+                # Process dates
+                data = process_dates_in_records(data)
+                
+                # Success indicator
+                st.sidebar.info("📊 Data loaded from Replit DB", icon="✅")
+                
+                return data
+            else:
+                # Check if there's data in the filesystem we can migrate
+                file_data = load_from_file(email_address)
+                
+                if file_data:
+                    # If we found file data, save it to Replit DB for next time
+                    save_charging_data(file_data, email_address)
+                    return file_data
+                
+                return []
+        except Exception as e:
+            st.error(f"Error loading from Replit DB: {str(e)}")
+            # Fall back to file storage
+            return load_from_file(email_address)
+    else:
+        # Use regular file storage
+        return load_from_file(email_address)
+
+def process_dates_in_records(data):
+    """Helper function to convert date strings to datetime objects"""
+    # Convert string dates back to datetime objects
+    for record in data:
+        if 'date' in record and isinstance(record['date'], str):
+            # Try different date formats for parsing
+            date_formats = [
+                # ISO format with various separators
+                '%Y-%m-%dT%H:%M:%S',      # ISO format with time
+                '%Y-%m-%dT%H:%M:%S.%f',   # ISO format with milliseconds
+                '%Y-%m-%d',               # ISO date only
+                
+                # Other common formats
+                '%m/%d/%Y',               # US format
+                '%d/%m/%Y',               # UK/AU format
+                '%B %d, %Y',              # Month name format
+                '%d-%m-%Y',               # Dash-separated format
+                '%d-%m-%y',               # Two-digit year format
+            ]
+            
+            parsed_date = None
+            for fmt in date_formats:
+                try:
+                    if 'T' in record['date'] and 'T' not in fmt:
+                        # Skip non-ISO formats for ISO strings
+                        continue
+                    
+                    # For ISO datetime format, try parsing just with fromisoformat
+                    if fmt == '%Y-%m-%dT%H:%M:%S' or fmt == '%Y-%m-%dT%H:%M:%S.%f':
+                        try:
+                            parsed_date = datetime.fromisoformat(record['date'])
+                            break
+                        except ValueError:
+                            continue
+                    
+                    # Otherwise use strptime
+                    parsed_date = datetime.strptime(record['date'], fmt)
+                    break
+                except ValueError:
+                    continue
+            
+            if parsed_date:
+                record['date'] = parsed_date
+            # If parsing fails, leave as string - don't discard the data
+    
+    return data
+
+def load_from_file(email_address=None):
+    """Helper function to load data from a file"""
     ensure_data_directory()
     
     # Get the appropriate file path for this user
@@ -180,52 +316,12 @@ def load_charging_data(email_address=None):
         with open(file_path, 'r') as f:
             data = json.load(f)
             
-        # Convert string dates back to datetime objects
-        for record in data:
-            if 'date' in record and isinstance(record['date'], str):
-                # Try different date formats for parsing
-                date_formats = [
-                    # ISO format with various separators
-                    '%Y-%m-%dT%H:%M:%S',      # ISO format with time
-                    '%Y-%m-%dT%H:%M:%S.%f',   # ISO format with milliseconds
-                    '%Y-%m-%d',               # ISO date only
-                    
-                    # Other common formats
-                    '%m/%d/%Y',               # US format
-                    '%d/%m/%Y',               # UK/AU format
-                    '%B %d, %Y',              # Month name format
-                    '%d-%m-%Y',               # Dash-separated format
-                    '%d-%m-%y',               # Two-digit year format
-                ]
-                
-                parsed_date = None
-                for fmt in date_formats:
-                    try:
-                        if 'T' in record['date'] and 'T' not in fmt:
-                            # Skip non-ISO formats for ISO strings
-                            continue
-                        
-                        # For ISO datetime format, try parsing just with fromisoformat
-                        if fmt == '%Y-%m-%dT%H:%M:%S' or fmt == '%Y-%m-%dT%H:%M:%S.%f':
-                            try:
-                                parsed_date = datetime.fromisoformat(record['date'])
-                                break
-                            except ValueError:
-                                continue
-                        
-                        # Otherwise use strptime
-                        parsed_date = datetime.strptime(record['date'], fmt)
-                        break
-                    except ValueError:
-                        continue
-                
-                if parsed_date:
-                    record['date'] = parsed_date
-                # If parsing fails, leave as string - don't discard the data
+        # Process dates
+        data = process_dates_in_records(data)
         
         return data
     except Exception as e:
-        st.error(f"Error loading charging data: {str(e)}")
+        st.error(f"Error loading charging data from file: {str(e)}")
         return []
 
 def merge_charging_data(existing_data, new_data):
@@ -374,15 +470,32 @@ def delete_charging_data(email_address=None):
     Args:
         email_address: Optional email address to delete data for a specific user
     """
-    ensure_data_directory()
+    success = False
     
-    # Get the appropriate file path for this user
+    # Use Replit DB if we're on Replit
+    if ON_REPLIT:
+        try:
+            # Get the appropriate DB key for this user
+            db_key = get_user_data_key(email_address)
+            
+            # Check if data exists in Replit DB
+            if db_key in replit_db:
+                # Delete from Replit DB
+                del replit_db[db_key]
+                st.sidebar.success("🗑️ Data deleted from Replit DB")
+                success = True
+        except Exception as e:
+            st.error(f"Error deleting from Replit DB: {str(e)}")
+    
+    # Always also delete from file system for complete cleanup
+    ensure_data_directory()
     file_path = get_user_data_file(email_address)
     
     if os.path.exists(file_path):
         os.remove(file_path)
-        return True
-    return False
+        success = True
+    
+    return success
 
 def delete_selected_records(record_ids, email_address=None):
     """
@@ -395,17 +508,12 @@ def delete_selected_records(record_ids, email_address=None):
     Returns:
         Tuple of (success, count) indicating if operation succeeded and how many records were deleted
     """
-    ensure_data_directory()
-    
-    # Get the appropriate file path for this user
-    file_path = get_user_data_file(email_address)
-    
-    if not os.path.exists(file_path):
-        return False, 0
-    
     try:
         # Load existing data
         existing_data = load_charging_data(email_address)
+        
+        if not existing_data:
+            return False, 0
         
         # Create a set of IDs to delete for faster lookup
         ids_to_delete = set(record_ids)
@@ -416,7 +524,7 @@ def delete_selected_records(record_ids, email_address=None):
         # Calculate how many records were deleted
         records_deleted = len(existing_data) - len(new_data)
         
-        # Save the updated data
+        # Save the updated data - this handles both file and Replit DB storage
         save_charging_data(new_data, email_address)
         
         return True, records_deleted
