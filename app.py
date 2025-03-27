@@ -14,7 +14,8 @@ from data_visualizer import create_visualizations
 from data_storage import (
     load_charging_data, save_charging_data, merge_charging_data, 
     convert_to_dataframe, filter_data_by_date_range, delete_charging_data,
-    filter_records_by_criteria, delete_selected_records, generate_record_id
+    filter_records_by_criteria, delete_selected_records, generate_record_id,
+    get_replit_status
 )
 from utils import get_date_range, export_data_as_csv, save_credentials, load_credentials
 from location_mapper import display_charging_map
@@ -224,6 +225,15 @@ with st.sidebar:
     # Database Cleaning section (only show if authenticated)
     if st.session_state.authenticated:
         st.subheader("Database Management")
+        
+        # Show Replit database status if available
+        replit_status = get_replit_status()
+        if replit_status['available']:
+            status_icon = "✅" if replit_status['enabled'] else "⚠️"
+            status_text = "enabled" if replit_status['enabled'] else "available but not active"
+            st.info(f"{status_icon} Replit persistence {status_text}")
+        else:
+            st.info("🔄 Using local file storage")
         
         # Show currently stored data info
         stored_data = load_charging_data(st.session_state.current_user_email)

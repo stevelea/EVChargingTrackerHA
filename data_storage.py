@@ -14,10 +14,23 @@ try:
     # Try to import the replit module
     from replit import db as replit_db
     ON_REPLIT = True
-    st.sidebar.markdown("🔁 **Replit persistence enabled**")
+    REPLIT_DB_AVAILABLE = True
 except ImportError:
     # If import fails, we're not on Replit
     ON_REPLIT = False
+    REPLIT_DB_AVAILABLE = False
+
+def get_replit_status():
+    """
+    Return status of Replit DB
+    
+    Returns:
+        Dictionary with status information
+    """
+    return {
+        "available": REPLIT_DB_AVAILABLE,
+        "enabled": ON_REPLIT,
+    }
 
 def get_user_data_key(email_address=None):
     """
@@ -187,10 +200,10 @@ def save_charging_data(data_list, email_address=None):
             # Store data as JSON string in Replit DB
             replit_db[db_key] = json.dumps(serializable_data, default=str)
             
-            # Log success
-            st.sidebar.info("📊 Data saved to Replit DB", icon="✅")
+            # Log success to console
+            print("📊 Data saved to Replit DB")
         except Exception as e:
-            st.error(f"Error saving to Replit DB: {str(e)}")
+            print(f"Error saving to Replit DB: {str(e)}")
             # Fall back to file storage
             save_to_file(serializable_data, email_address)
     else:
@@ -233,8 +246,8 @@ def load_charging_data(email_address=None):
                 # Process dates
                 data = process_dates_in_records(data)
                 
-                # Success indicator
-                st.sidebar.info("📊 Data loaded from Replit DB", icon="✅")
+                # Success indicator - we'll update UI in app.py instead
+                replit_data_loaded = True
                 
                 return data
             else:
@@ -248,7 +261,7 @@ def load_charging_data(email_address=None):
                 
                 return []
         except Exception as e:
-            st.error(f"Error loading from Replit DB: {str(e)}")
+            print(f"Error loading from Replit DB: {str(e)}")
             # Fall back to file storage
             return load_from_file(email_address)
     else:
@@ -321,7 +334,7 @@ def load_from_file(email_address=None):
         
         return data
     except Exception as e:
-        st.error(f"Error loading charging data from file: {str(e)}")
+        print(f"Error loading charging data from file: {str(e)}")
         return []
 
 def merge_charging_data(existing_data, new_data):
@@ -482,10 +495,10 @@ def delete_charging_data(email_address=None):
             if db_key in replit_db:
                 # Delete from Replit DB
                 del replit_db[db_key]
-                st.sidebar.success("🗑️ Data deleted from Replit DB")
+                # Success indicator - we'll update UI in app.py
                 success = True
         except Exception as e:
-            st.error(f"Error deleting from Replit DB: {str(e)}")
+            print(f"Error deleting from Replit DB: {str(e)}")
     
     # Always also delete from file system for complete cleanup
     ensure_data_directory()
@@ -529,7 +542,7 @@ def delete_selected_records(record_ids, email_address=None):
         
         return True, records_deleted
     except Exception as e:
-        st.error(f"Error deleting selected records: {str(e)}")
+        print(f"Error deleting selected records: {str(e)}")
         return False, 0
 
 def filter_records_by_criteria(criteria, email_address=None):
