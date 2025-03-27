@@ -168,9 +168,41 @@ def display_charging_map(df):
         col1, col2 = st.columns(2)
         
         with col1:
-            # Allow user to set home location
+            # Allow user to set home location and persist it
             if 'home_location' not in st.session_state:
-                st.session_state.home_location = "Garage"
+                # Try to load from data storage
+                try:
+                    # Import get_replit_status function from data_storage module
+                    from data_storage import get_replit_status
+                    replit_status = get_replit_status()
+                    
+                    if replit_status.get('available', False):
+                        from replit import db
+                        home_location_key = f"home_location_{st.session_state.get('current_user_email', 'default')}"
+                        if home_location_key in db:
+                            st.session_state.home_location = db[home_location_key]
+                        else:
+                            st.session_state.home_location = "Garage"
+                    else:
+                        # Try to load from a JSON file
+                        import json
+                        import os
+                        settings_file = os.path.join("data", "user_settings.json")
+                        if os.path.exists(settings_file):
+                            try:
+                                with open(settings_file, 'r') as f:
+                                    settings = json.load(f)
+                                email_key = st.session_state.get('current_user_email', 'default')
+                                if email_key in settings and 'home_location' in settings[email_key]:
+                                    st.session_state.home_location = settings[email_key]['home_location']
+                                else:
+                                    st.session_state.home_location = "Garage"
+                            except:
+                                st.session_state.home_location = "Garage"
+                        else:
+                            st.session_state.home_location = "Garage"
+                except:
+                    st.session_state.home_location = "Garage"
             
             home_location = st.text_input(
                 "Home Charger Location Name:", 
@@ -179,6 +211,48 @@ def display_charging_map(df):
             
             if home_location != st.session_state.home_location:
                 st.session_state.home_location = home_location
+                
+                # Save the home location for persistence
+                try:
+                    # Get replit status again
+                    from data_storage import get_replit_status
+                    replit_status = get_replit_status()
+                    
+                    if replit_status.get('available', False):
+                        from replit import db
+                        home_location_key = f"home_location_{st.session_state.get('current_user_email', 'default')}"
+                        db[home_location_key] = home_location
+                    else:
+                        # Save to a JSON file
+                        import json
+                        import os
+                        
+                        # Ensure data directory exists
+                        os.makedirs("data", exist_ok=True)
+                        
+                        settings_file = os.path.join("data", "user_settings.json")
+                        settings = {}
+                        
+                        # Load existing settings if available
+                        if os.path.exists(settings_file):
+                            try:
+                                with open(settings_file, 'r') as f:
+                                    settings = json.load(f)
+                            except:
+                                settings = {}
+                        
+                        # Update with new home location
+                        email_key = st.session_state.get('current_user_email', 'default')
+                        if email_key not in settings:
+                            settings[email_key] = {}
+                        settings[email_key]['home_location'] = home_location
+                        
+                        # Save settings
+                        with open(settings_file, 'w') as f:
+                            json.dump(settings, f)
+                except:
+                    st.warning("Unable to save home location for future sessions")
+                
                 # Clear cache for home location
                 if 'geocoding_cache' in st.session_state and home_location.lower() in st.session_state.geocoding_cache:
                     del st.session_state.geocoding_cache[home_location.lower()]

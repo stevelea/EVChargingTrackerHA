@@ -35,11 +35,17 @@ def parse_charging_emails(emails):
             r'Start Time:\s*(\d{1,2}:\d{2}:\d{2})',
             r'Charging Time:\s*(\d{1,2}:\d{2} [APM]{2})'
         ],
-        # Match location patterns
+        # Match location patterns - expanded to capture more formats
         'location': [
             r'Location:\s*(.+?)(?:\n|\r|$)',
             r'Station:\s*(.+?)(?:\n|\r|$)',
-            r'Charger Location:\s*(.+?)(?:\n|\r|$)'
+            r'Charger Location:\s*(.+?)(?:\n|\r|$)',
+            r'Charging Station:\s*(.+?)(?:\n|\r|$)',
+            r'Address:\s*(.+?)(?:\n|\r|$)',
+            r'Station Address:\s*(.+?)(?:\n|\r|$)',
+            r'at\s+(.+?)\s+charging station',
+            r'Thank you for charging at\s+(.+?)[\.\n\r]',
+            r'You charged at\s+(.+?)[,\.\n\r]'
         ],
         # Match total kWh delivered
         'total_kwh': [
