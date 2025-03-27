@@ -52,14 +52,24 @@ def generate_record_id(record):
     # Date - convert to string if it's a datetime
     if record.get('date'):
         if isinstance(record['date'], datetime):
-            id_fields.append(record['date'].strftime('%Y-%m-%d'))
+            id_fields.append(record['date'].strftime('%Y-%m-%d %H:%M:%S'))
         else:
             id_fields.append(str(record['date']))
     
-    # Add other identifying fields
-    for field in ['provider', 'location', 'total_kwh', 'total_cost']:
-        if record.get(field):
-            id_fields.append(str(record[field]))
+    # For EVCC data, include time field if available to make it more unique
+    if record.get('source') == 'EVCC CSV' and record.get('time'):
+        id_fields.append(str(record['time']))
+    
+    # Add identifying fields - for EVCC use all numeric fields to ensure uniqueness
+    if record.get('source') == 'EVCC CSV':
+        for field in ['provider', 'location', 'total_kwh', 'duration', 'vehicle', 'cost_per_kwh', 'total_cost']:
+            if record.get(field):
+                id_fields.append(str(record[field]))
+    else:
+        # For other sources, use standard fields
+        for field in ['provider', 'location', 'total_kwh', 'total_cost']:
+            if record.get(field):
+                id_fields.append(str(record[field]))
     
     # Include source if available
     if record.get('source'):
@@ -71,6 +81,10 @@ def generate_record_id(record):
     elif record.get('pdf_filename'):
         id_fields.append(str(record['pdf_filename']))
     
+    # For EVCC, also include finished timestamp if available for more uniqueness
+    if record.get('source') == 'EVCC CSV' and record.get('end_date'):
+        id_fields.append(str(record['end_date']))
+        
     # Create a hash from these fields
     record_str = '|'.join(id_fields)
     return hashlib.md5(record_str.encode('utf-8')).hexdigest()

@@ -69,28 +69,62 @@ def create_visualizations(data):
                 # Skip columns that can't be converted
     
     # Time series of charging sessions
-    # Use default size for missing values with explicit list and ensure numeric values
-    # Convert to standard Python list of float values to avoid Narwhals Series issues
-    peak_kw_values = data['peak_kw'].apply(lambda x: float(x) if pd.notnull(x) else 5.0).tolist()
+    # Create a fixed size value for all points if peak_kw is missing or contains invalid values
+    peak_kw_values = None
+    if 'peak_kw' in data.columns:
+        try:
+            # Try to convert to numeric values with a default for missing data
+            peak_kw_values = []
+            for val in data['peak_kw']:
+                try:
+                    if pd.notnull(val) and val != 0:
+                        peak_kw_values.append(float(val))
+                    else:
+                        peak_kw_values.append(5.0)  # Default size
+                except:
+                    peak_kw_values.append(5.0)  # Default for unconvertible values
+        except Exception as e:
+            print(f"Error converting peak_kw: {str(e)}")
+            peak_kw_values = None
     
-    figures['time_series'] = px.scatter(
-        plot_data,  # Use pre-converted data
-        x='date',
-        y='total_kwh',
-        size=peak_kw_values,  # Pass as explicit list of numeric values
-        color='cost_per_kwh',
-        hover_name='location',
-        hover_data=['provider', 'total_cost', 'peak_kw', 'duration'],
-        title='Charging Sessions Over Time',
-        labels={
-            'date': 'Date',
-            'total_kwh': 'Energy Delivered (kWh)',
-            'peak_kw': 'Peak Power (kW)',
-            'cost_per_kwh': 'Cost per kWh ($)',
-            'provider': 'Provider'
-        },
-        color_continuous_scale='Viridis'
-    )
+    # Create scatter plot with or without variable size
+    if peak_kw_values:
+        figures['time_series'] = px.scatter(
+            plot_data,  # Use pre-converted data
+            x='date',
+            y='total_kwh',
+            size=peak_kw_values,  # Pass as explicit list of numeric values
+            color='cost_per_kwh',
+            hover_name='location',
+            hover_data=['provider', 'total_cost', 'duration'],
+            title='Charging Sessions Over Time',
+            labels={
+                'date': 'Date',
+                'total_kwh': 'Energy Delivered (kWh)',
+                'peak_kw': 'Peak Power (kW)',
+                'cost_per_kwh': 'Cost per kWh ($)',
+                'provider': 'Provider'
+            },
+            color_continuous_scale='Viridis'
+        )
+    else:
+        # Create scatter plot without variable size
+        figures['time_series'] = px.scatter(
+            plot_data,  # Use pre-converted data
+            x='date',
+            y='total_kwh',
+            color='cost_per_kwh',
+            hover_name='location',
+            hover_data=['provider', 'total_cost', 'duration'],
+            title='Charging Sessions Over Time',
+            labels={
+                'date': 'Date',
+                'total_kwh': 'Energy Delivered (kWh)',
+                'cost_per_kwh': 'Cost per kWh ($)',
+                'provider': 'Provider'
+            },
+            color_continuous_scale='Viridis'
+        )
     
     figures['time_series'].update_layout(
         xaxis_title='Date',
@@ -98,20 +132,65 @@ def create_visualizations(data):
         hovermode='closest'
     )
     
-    # Histogram of peak power
-    figures['peak_kw_histogram'] = px.histogram(
-        data,
-        x='peak_kw',
-        nbins=20,
-        title='Distribution of Peak Charging Power',
-        labels={'peak_kw': 'Peak Power (kW)'},
-        color_discrete_sequence=['#3366CC']
-    )
-    
-    figures['peak_kw_histogram'].update_layout(
-        xaxis_title='Peak Power (kW)',
-        yaxis_title='Number of Sessions'
-    )
+    # Histogram of peak power - with error handling for missing or invalid peak_kw data
+    if 'peak_kw' in data.columns and data['peak_kw'].notna().any():
+        try:
+            # Ensure we have valid numeric data
+            valid_peak_data = data[data['peak_kw'].notna()].copy()
+            valid_peak_data['peak_kw'] = pd.to_numeric(valid_peak_data['peak_kw'], errors='coerce')
+            valid_peak_data = valid_peak_data.dropna(subset=['peak_kw'])
+            
+            if len(valid_peak_data) > 0:
+                figures['peak_kw_histogram'] = px.histogram(
+                    valid_peak_data,
+                    x='peak_kw',
+                    nbins=20,
+                    title='Distribution of Peak Charging Power',
+                    labels={'peak_kw': 'Peak Power (kW)'},
+                    color_discrete_sequence=['#3366CC']
+                )
+                
+                figures['peak_kw_histogram'].update_layout(
+                    xaxis_title='Peak Power (kW)',
+                    yaxis_title='Number of Sessions'
+                )
+            else:
+                # Fallback for no valid peak_kw data
+                figures['peak_kw_histogram'] = go.Figure()
+                figures['peak_kw_histogram'].add_annotation(
+                    text="No valid peak power data available",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5, showarrow=False,
+                    font=dict(size=16)
+                )
+                figures['peak_kw_histogram'].update_layout(
+                    title='Distribution of Peak Charging Power (No Data)'
+                )
+        except Exception as e:
+            print(f"Error creating peak_kw_histogram: {str(e)}")
+            # Create an empty figure with error message
+            figures['peak_kw_histogram'] = go.Figure()
+            figures['peak_kw_histogram'].add_annotation(
+                text="Error creating peak power histogram",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5, showarrow=False,
+                font=dict(size=16)
+            )
+            figures['peak_kw_histogram'].update_layout(
+                title='Distribution of Peak Charging Power (Error)'
+            )
+    else:
+        # If peak_kw column doesn't exist or has no data
+        figures['peak_kw_histogram'] = go.Figure()
+        figures['peak_kw_histogram'].add_annotation(
+            text="No peak power data available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16)
+        )
+        figures['peak_kw_histogram'].update_layout(
+            title='Distribution of Peak Charging Power (No Data)'
+        )
     
     # Energy delivered by location
     location_kwh = data.groupby('location')['total_kwh'].sum().reset_index()
@@ -249,26 +328,76 @@ def create_visualizations(data):
     
     # Charging duration analysis
     # Convert size parameter to list and ensure it contains proper numeric values
-    total_cost_values = data['total_cost'].apply(lambda x: float(x) if pd.notnull(x) else 5.0).tolist()
+    total_cost_values = []
+    for val in data['total_cost']:
+        try:
+            if pd.notnull(val) and val != 0:
+                total_cost_values.append(float(val))
+            else:
+                total_cost_values.append(5.0)  # Default size
+        except:
+            total_cost_values.append(5.0)  # Default for unconvertible values
     
-    figures['charging_duration'] = px.scatter(
-        plot_data,  # Use pre-converted data
-        x='total_kwh',
-        y='peak_kw',
-        size=total_cost_values,  # Pass as explicit list
-        color='cost_per_kwh',
-        hover_name='location',
-        hover_data=['provider', 'date', 'duration'],
-        title='Charging Efficiency Analysis',
-        labels={
-            'total_kwh': 'Energy Delivered (kWh)',
-            'peak_kw': 'Peak Power (kW)',
-            'total_cost': 'Total Cost ($)',
-            'cost_per_kwh': 'Cost per kWh ($)',
-            'provider': 'Provider'
-        },
-        color_continuous_scale='Viridis'
-    )
+    # Create a fallback version if peak_kw is missing or problematic
+    if 'peak_kw' in data.columns and data['peak_kw'].notna().any():
+        try:
+            figures['charging_duration'] = px.scatter(
+                plot_data,  # Use pre-converted data
+                x='total_kwh',
+                y='peak_kw',
+                size=total_cost_values,  # Pass as explicit list
+                color='cost_per_kwh',
+                hover_name='location',
+                hover_data=['provider', 'date', 'duration'],
+                title='Charging Efficiency Analysis',
+                labels={
+                    'total_kwh': 'Energy Delivered (kWh)',
+                    'peak_kw': 'Peak Power (kW)',
+                    'total_cost': 'Total Cost ($)',
+                    'cost_per_kwh': 'Cost per kWh ($)',
+                    'provider': 'Provider'
+                },
+                color_continuous_scale='Viridis'
+            )
+        except Exception as e:
+            print(f"Error creating charging_duration scatter plot: {str(e)}")
+            # Fallback to a different visualization without peak_kw
+            figures['charging_duration'] = px.scatter(
+                plot_data,
+                x='total_kwh',
+                y='total_cost',
+                size=total_cost_values,
+                color='cost_per_kwh',
+                hover_name='location',
+                hover_data=['provider', 'date', 'duration'],
+                title='Charging Cost vs Energy Analysis',
+                labels={
+                    'total_kwh': 'Energy Delivered (kWh)',
+                    'total_cost': 'Total Cost ($)',
+                    'cost_per_kwh': 'Cost per kWh ($)',
+                    'provider': 'Provider'
+                },
+                color_continuous_scale='Viridis'
+            )
+    else:
+        # If peak_kw is not available, create an alternative visualization
+        figures['charging_duration'] = px.scatter(
+            plot_data,
+            x='total_kwh',
+            y='total_cost',
+            size=total_cost_values,
+            color='cost_per_kwh',
+            hover_name='location',
+            hover_data=['provider', 'date', 'duration'],
+            title='Charging Cost vs Energy Analysis',
+            labels={
+                'total_kwh': 'Energy Delivered (kWh)',
+                'total_cost': 'Total Cost ($)',
+                'cost_per_kwh': 'Cost per kWh ($)',
+                'provider': 'Provider'
+            },
+            color_continuous_scale='Viridis'
+        )
     
     figures['charging_duration'].update_layout(
         xaxis_title='Energy Delivered (kWh)',
@@ -340,20 +469,53 @@ def create_visualizations(data):
             yaxis_title='Total Cost ($)'
         )
         
-        # Create kwh comparison chart
-        figures['provider_kwh_comparison'] = px.bar(
-            provider_stats,
-            x='provider',
-            y='total_kwh',
-            title='Energy Delivered by Provider',
-            labels={
-                'provider': 'Provider', 
-                'total_kwh': 'Total Energy (kWh)'
-            },
-            color='peak_kw',
-            color_continuous_scale='Viridis',
-            hover_data=['sessions', 'avg_cost_per_kwh']
-        )
+        # Create kwh comparison chart - safely handle peak_kw coloring
+        try:
+            # Check if peak_kw has any valid data
+            if 'peak_kw' in provider_stats.columns and provider_stats['peak_kw'].notna().any():
+                # Create with peak_kw coloring
+                figures['provider_kwh_comparison'] = px.bar(
+                    provider_stats,
+                    x='provider',
+                    y='total_kwh',
+                    title='Energy Delivered by Provider',
+                    labels={
+                        'provider': 'Provider', 
+                        'total_kwh': 'Total Energy (kWh)'
+                    },
+                    color='peak_kw',
+                    color_continuous_scale='Viridis',
+                    hover_data=['sessions', 'avg_cost_per_kwh']
+                )
+            else:
+                # Create without problematic peak_kw coloring
+                figures['provider_kwh_comparison'] = px.bar(
+                    provider_stats,
+                    x='provider',
+                    y='total_kwh',
+                    title='Energy Delivered by Provider',
+                    labels={
+                        'provider': 'Provider', 
+                        'total_kwh': 'Total Energy (kWh)'
+                    },
+                    color='avg_cost_per_kwh',  # Use cost instead of peak_kw
+                    color_continuous_scale='RdYlGn_r',
+                    hover_data=['sessions', 'avg_cost_per_kwh']
+                )
+        except Exception as e:
+            print(f"Error creating provider_kwh_comparison: {str(e)}")
+            # Fallback to simpler version without color scale
+            figures['provider_kwh_comparison'] = px.bar(
+                provider_stats,
+                x='provider',
+                y='total_kwh',
+                title='Energy Delivered by Provider',
+                labels={
+                    'provider': 'Provider', 
+                    'total_kwh': 'Total Energy (kWh)'
+                },
+                hover_data=['sessions', 'avg_cost_per_kwh']
+            )
         
         figures['provider_kwh_comparison'].update_layout(
             xaxis_title='Provider',
