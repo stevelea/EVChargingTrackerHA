@@ -112,6 +112,12 @@ def parse_charging_emails(emails):
         'location': [
             r'Location:\s*(.+?)(?:\n|\r|$)',
             r'Charging station:\s*(.+?)(?:\n|\r|$)',
+            # Pattern for AmpCharge format with location and address on separate lines
+            r'AmpCharge Pty Ltd\s*\n+\s*([^,\n]+(?:Highway|Road|Street|Avenue|Lane|Drive)(?:[^,\n]+)?,\s*[^,\n]+\s*\d{4})',
+            # Pattern for location with street number, name, and suburb with postcode
+            r'(?:Pacific|Princes|Hume|Western|Eastern|Northern|Southern)\s+Highway\s+(\d+-\d+|\d+),\s*([^,\n]+)\s+(\d{4})',
+            # Address formats on separate lines
+            r'(?:AmpCharge|Ampol)[^\n]*\n+([^\n]+(?:Highway|Road|Street|Avenue|Lane|Drive)[^\n]*(?:,|\n)[^\n]*\d{4})',
         ],
         'total_kwh': [
             r'Energy delivered:\s*([\d.]+)\s*kWh',
@@ -236,7 +242,25 @@ def parse_charging_emails(emails):
                     for pattern in field_patterns:
                         match = re.search(pattern, email_body, re.IGNORECASE)
                         if match:
-                            data[field] = match.group(1).strip()
+                            # For special highway pattern with multiple groups
+                            if field == 'location' and 'Highway' in pattern and match.lastindex and match.lastindex > 1:
+                                # Combine highway, number, suburb and postcode into a proper address
+                                highway = match.group(1) if match.group(1) else "Pacific Highway"
+                                number = match.group(2) if match.group(2) else ""
+                                suburb = match.group(3) if match.group(3) and match.lastindex >= 3 else ""
+                                postcode = match.group(4) if match.lastindex >= 4 and match.group(4) else ""
+                                
+                                # Build a clean address string
+                                address_parts = []
+                                if highway: address_parts.append(highway)
+                                if number: address_parts.append(number)
+                                if suburb: address_parts.append(suburb)
+                                if postcode: address_parts.append(postcode)
+                                
+                                data[field] = "AmpCharge " + ", ".join(address_parts).strip()
+                            else:
+                                # Standard extraction for other fields
+                                data[field] = match.group(1).strip()
                             break
                 
                 # Use regular patterns for fields not in ampol_patterns

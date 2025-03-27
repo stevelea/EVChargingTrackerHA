@@ -156,7 +156,10 @@ def create_visualizations(data):
             size=peak_kw_values,  # Pass as explicit list of numeric values
             color='cost_per_kwh',
             hover_name='location',
-            hover_data=["provider", cost_col],  # Use the correct column name
+            hover_data={
+                "provider": plot_data['provider'].tolist() if 'provider' in plot_data else None,
+                cost_col: plot_data[cost_col].tolist() if cost_col in plot_data else None
+            },  # Convert hover_data fields to lists
             title='Charging Sessions Over Time',
             labels={
                 'date': 'Date',
@@ -176,7 +179,10 @@ def create_visualizations(data):
             y=energy_col,  # Use the correct column name
             color='cost_per_kwh',
             hover_name='location',
-            hover_data=["provider", cost_col],  # Use the correct column name
+            hover_data={
+                "provider": plot_data['provider'].tolist() if 'provider' in plot_data else None,
+                cost_col: plot_data[cost_col].tolist() if cost_col in plot_data else None
+            },  # Convert hover_data fields to lists
             title='Charging Sessions Over Time',
             labels={
                 'date': 'Date',
@@ -401,7 +407,11 @@ def create_visualizations(data):
             'provider': 'Provider',
             'total_kwh': 'Energy Delivered (kWh)'
         },
-        hover_data=['location', 'total_cost']
+        # Convert hover_data fields to lists if needed
+        hover_data={
+            'location': plot_data['location'].tolist() if 'location' in plot_data else None,
+            'total_cost': plot_data[cost_col].tolist() if cost_col in plot_data else None
+        }
     )
     
     figures['cost_per_kwh'].update_layout(
@@ -439,7 +449,10 @@ def create_visualizations(data):
                 size=total_cost_values,  # Pass as explicit list
                 color='cost_per_kwh',
                 hover_name='location',
-                hover_data=["provider", "date"],
+                hover_data={
+                    "provider": plot_data['provider'].tolist() if 'provider' in plot_data else None,
+                    "date": plot_data['date'].tolist() if 'date' in plot_data else None
+                },
                 title='Charging Efficiency Analysis',
                 labels={
                     'total_kwh': 'Energy Delivered (kWh)',
@@ -460,7 +473,10 @@ def create_visualizations(data):
                 size=total_cost_values,
                 color='cost_per_kwh',
                 hover_name='location',
-                hover_data=["provider", "date"],
+                hover_data={
+                    "provider": plot_data['provider'].tolist() if 'provider' in plot_data else None,
+                    "date": plot_data['date'].tolist() if 'date' in plot_data else None
+                },
                 title='Charging Cost vs Energy Analysis',
                 labels={
                     'total_kwh': 'Energy Delivered (kWh)',
@@ -479,7 +495,10 @@ def create_visualizations(data):
             size=total_cost_values,
             color='cost_per_kwh',
             hover_name='location',
-            hover_data=["provider", "date"],
+            hover_data={
+                "provider": plot_data['provider'].tolist() if 'provider' in plot_data else None,
+                "date": plot_data['date'].tolist() if 'date' in plot_data else None
+            },
             title='Charging Cost vs Energy Analysis',
             labels={
                 'total_kwh': 'Energy Delivered (kWh)',
@@ -521,7 +540,10 @@ def create_visualizations(data):
         },
         color='avg_cost_per_kwh',
         color_continuous_scale='RdYlGn_r',
-        hover_data=[energy_col, 'avg_cost_per_kwh']
+        hover_data={
+            energy_col: location_cost[energy_col].tolist() if energy_col in location_cost else None,
+            'avg_cost_per_kwh': location_cost['avg_cost_per_kwh'].tolist() if 'avg_cost_per_kwh' in location_cost else None
+        }
     )
     
     figures['cost_by_location'].update_layout(
@@ -566,7 +588,11 @@ def create_visualizations(data):
             },
             color='avg_cost_per_kwh',
             color_continuous_scale='RdYlGn_r',
-            hover_data=[energy_col, 'avg_cost_per_kwh', 'sessions']
+            hover_data={
+                energy_col: provider_stats[energy_col].tolist() if energy_col in provider_stats else None,
+                'avg_cost_per_kwh': provider_stats['avg_cost_per_kwh'].tolist() if 'avg_cost_per_kwh' in provider_stats else None,
+                'sessions': provider_stats['sessions'].tolist() if 'sessions' in provider_stats else None
+            }
         )
         
         figures['provider_cost_comparison'].update_layout(
@@ -590,7 +616,10 @@ def create_visualizations(data):
                     },
                     color='peak_kw',
                     color_continuous_scale='Viridis',
-                    hover_data=['sessions', 'avg_cost_per_kwh']
+                    hover_data={
+                        'sessions': provider_stats['sessions'].tolist() if 'sessions' in provider_stats else None,
+                        'avg_cost_per_kwh': provider_stats['avg_cost_per_kwh'].tolist() if 'avg_cost_per_kwh' in provider_stats else None
+                    }
                 )
             else:
                 # Create without problematic peak_kw coloring
@@ -605,7 +634,10 @@ def create_visualizations(data):
                     },
                     color='avg_cost_per_kwh',  # Use cost instead of peak_kw
                     color_continuous_scale='RdYlGn_r',
-                    hover_data=['sessions', 'avg_cost_per_kwh']
+                    hover_data={
+                        'sessions': provider_stats['sessions'].tolist() if 'sessions' in provider_stats else None,
+                        'avg_cost_per_kwh': provider_stats['avg_cost_per_kwh'].tolist() if 'avg_cost_per_kwh' in provider_stats else None
+                    }
                 )
         except Exception as e:
             print(f"Error creating provider_kwh_comparison: {str(e)}")
@@ -619,7 +651,10 @@ def create_visualizations(data):
                     'provider': 'Provider', 
                     energy_col: 'Total Energy (kWh)'
                 },
-                hover_data=['sessions', 'avg_cost_per_kwh']
+                hover_data={
+                    'sessions': provider_stats['sessions'].tolist() if 'sessions' in provider_stats else None,
+                    'avg_cost_per_kwh': provider_stats['avg_cost_per_kwh'].tolist() if 'avg_cost_per_kwh' in provider_stats else None
+                }
             )
         
         figures['provider_kwh_comparison'].update_layout(
@@ -665,7 +700,10 @@ def create_visualizations(data):
                     size=energy_col,
                     color='provider',
                     hover_name='location',
-                    hover_data=['distance', energy_col],
+                    hover_data={
+                        'distance': efficiency_data['distance'].tolist() if 'distance' in efficiency_data else None,
+                        energy_col: efficiency_data[energy_col].tolist() if energy_col in efficiency_data else None
+                    },
                     title='Energy Efficiency Over Time (kWh per km)',
                     labels={
                         'date': 'Date',
@@ -711,7 +749,10 @@ def create_visualizations(data):
                     size=cost_col,
                     color='provider',
                     hover_name='location',
-                    hover_data=['distance', cost_col],
+                    hover_data={
+                        'distance': cost_per_km_data['distance'].tolist() if 'distance' in cost_per_km_data else None,
+                        cost_col: cost_per_km_data[cost_col].tolist() if cost_col in cost_per_km_data else None
+                    },
                     title='Cost Efficiency Over Time ($ per km)',
                     labels={
                         'date': 'Date',
