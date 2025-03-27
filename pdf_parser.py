@@ -129,7 +129,16 @@ def parse_charging_pdf(pdf_file):
             r'at\s+(.+?)\s+charging station',
             r'Thank you for charging at\s+(.+?)[\.\n\r]',
             r'You charged at\s+(.+?)[,\.\n\r]',
-            r'Station Name:\s*(.+?)(?:\n|\r|$)'
+            r'Station Name:\s*(.+?)(?:\n|\r|$)',
+            # Specific patterns for Evie Networks format
+            r'Your charging session receipt\s*\n+.*\n+\s*(.+?)\s*\n',
+            r'Warners Bay Grove\s*[\n\r]+\s*(.+?)[,\.\n\r]',
+            r'(\d+\s+[A-Za-z]+\s+(?:Rd|Road|St|Street|Ave|Avenue|Blvd|Boulevard|Dr|Drive)[^\n\r,]*)',
+            r'Your charging session at\s+(.+?)[,\.\n\r]',
+            # Match for address format with street number
+            r'\n(\d+\s+[^\n,]+(?:Road|Rd|Street|St|Avenue|Ave|Drive|Dr|Hwy|Highway|Lane|Ln)[^\n,]*)',
+            # Match for location name at top of receipt
+            r'^\s*([^\n]+?)\s*\n+(?:Your charging session|Charging session)'
         ],
         # Match total kWh delivered
         'total_kwh': [
