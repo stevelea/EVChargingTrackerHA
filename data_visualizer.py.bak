@@ -125,23 +125,20 @@ def create_visualizations(data):
     peak_kw_values = None
     if 'peak_kw' in data.columns:
         try:
-            # Create a list directly with proper Python types (not pandas Series objects)
-            peak_kw_values = []
+            # First ensure it's a numeric series, coercing invalid values to NaN
+            numeric_peak_kw = pd.to_numeric(data['peak_kw'], errors='coerce')
             
-            # Process each value individually to ensure proper conversion
-            for val in data['peak_kw']:
-                try:
-                    num_val = float(val) if val is not None and pd.notna(val) else 5.0
-                    # Use default if value is 0
-                    peak_kw_values.append(5.0 if num_val == 0 else num_val)
-                except (ValueError, TypeError):
-                    # Handle conversion errors
-                    peak_kw_values.append(5.0)
+            # Then replace NaN values with a default
+            numeric_peak_kw = numeric_peak_kw.fillna(5.0)
             
-            # Double-check that we have the correct number of values
-            if len(peak_kw_values) != len(data):
-                print(f"Peak kW values length mismatch: {len(peak_kw_values)} vs {len(data)}")
-                peak_kw_values = [5.0] * len(data)
+            # Replace 0 values with the default
+            numeric_peak_kw = numeric_peak_kw.replace(0, 5.0)
+            
+            # Convert to a Python list (not a pandas Series)
+            peak_kw_values = numeric_peak_kw.tolist()
+            
+            # Verify each value is actually a float (or an int)
+            peak_kw_values = [float(val) for val in peak_kw_values]
         except Exception as e:
             print(f"Error converting peak_kw: {str(e)}")
             # If conversion fails, create a list of fixed values
@@ -156,7 +153,7 @@ def create_visualizations(data):
             size=peak_kw_values,  # Pass as explicit list of numeric values
             color='cost_per_kwh',
             hover_name='location',
-            hover_data=["provider", cost_col],  # Use the correct column name
+            hover_data=['provider', cost_col, 'duration'],  # Use the correct column name
             title='Charging Sessions Over Time',
             labels={
                 'date': 'Date',
@@ -176,7 +173,7 @@ def create_visualizations(data):
             y=energy_col,  # Use the correct column name
             color='cost_per_kwh',
             hover_name='location',
-            hover_data=["provider", cost_col],  # Use the correct column name
+            hover_data=['provider', cost_col, 'duration'],  # Use the correct column name
             title='Charging Sessions Over Time',
             labels={
                 'date': 'Date',
@@ -370,23 +367,7 @@ def create_visualizations(data):
     
     # Cost per kWh over time
     # Convert size parameter explicitly and ensure it's properly converted to numeric values
-    total_kwh_values = []
-    
-    # Process each value individually to ensure proper conversion
-    for val in data[energy_col]:
-        try:
-            # First convert to float safely
-            num_val = float(val) if val is not None and pd.notna(val) else 5.0
-            # Use default if value is 0
-            total_kwh_values.append(5.0 if num_val == 0 else num_val)
-        except (ValueError, TypeError):
-            # Handle conversion errors
-            total_kwh_values.append(5.0)
-            
-    # Double-check that we have the correct number of values
-    if len(total_kwh_values) != len(data):
-        print(f"Energy values length mismatch: {len(total_kwh_values)} vs {len(data)}")
-        total_kwh_values = [5.0] * len(data)
+    total_kwh_values = data[energy_col].apply(lambda x: float(x) if pd.notnull(x) else 5.0).tolist()
     
     figures['cost_per_kwh'] = px.scatter(
         plot_data,  # Use pre-converted data
@@ -412,22 +393,14 @@ def create_visualizations(data):
     # Charging duration analysis
     # Convert size parameter to list and ensure it contains proper numeric values
     total_cost_values = []
-    
-    # Process each value individually to ensure proper conversion
     for val in data[cost_col]:
         try:
-            # First convert to float safely
-            num_val = float(val) if val is not None and pd.notna(val) else 5.0
-            # Use default if value is 0
-            total_cost_values.append(5.0 if num_val == 0 else num_val)
-        except (ValueError, TypeError):
-            # Handle conversion errors
-            total_cost_values.append(5.0)
-            
-    # Double-check that we have the correct number of values
-    if len(total_cost_values) != len(data):
-        print(f"Cost values length mismatch: {len(total_cost_values)} vs {len(data)}")
-        total_cost_values = [5.0] * len(data)
+            if pd.notnull(val) and val != 0:
+                total_cost_values.append(float(val))
+            else:
+                total_cost_values.append(5.0)  # Default size
+        except:
+            total_cost_values.append(5.0)  # Default for unconvertible values
     
     # Create a fallback version if peak_kw is missing or problematic
     if 'peak_kw' in data.columns and data['peak_kw'].notna().any():
@@ -439,7 +412,7 @@ def create_visualizations(data):
                 size=total_cost_values,  # Pass as explicit list
                 color='cost_per_kwh',
                 hover_name='location',
-                hover_data=["provider", "date"],
+                hover_data=['provider', 'date', 'duration'],
                 title='Charging Efficiency Analysis',
                 labels={
                     'total_kwh': 'Energy Delivered (kWh)',
@@ -460,7 +433,7 @@ def create_visualizations(data):
                 size=total_cost_values,
                 color='cost_per_kwh',
                 hover_name='location',
-                hover_data=["provider", "date"],
+                hover_data=['provider', 'date', 'duration'],
                 title='Charging Cost vs Energy Analysis',
                 labels={
                     'total_kwh': 'Energy Delivered (kWh)',
@@ -479,7 +452,7 @@ def create_visualizations(data):
             size=total_cost_values,
             color='cost_per_kwh',
             hover_name='location',
-            hover_data=["provider", "date"],
+            hover_data=['provider', 'date', 'duration'],
             title='Charging Cost vs Energy Analysis',
             labels={
                 'total_kwh': 'Energy Delivered (kWh)',

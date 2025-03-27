@@ -61,7 +61,13 @@ if 'charging_data' not in st.session_state:
             if test_data:
                 st.session_state.charging_data = clean_charging_data(test_data)
                 st.session_state.current_user_email = email_address
-                st.session_state.authenticated = True  # Auto-authenticate for testing
+                # Only auto-authenticate if specifically requested (not just loading test data)
+                if os.environ.get('AUTO_AUTHENTICATE', 'false').lower() == 'true':
+                    st.session_state.authenticated = True  # Auto-authenticate for testing
+                else:
+                    # Make sure test email is loaded in the sidebar, but still require login
+                    if 'authenticated' not in st.session_state:
+                        st.session_state.authenticated = False
                 
                 # Debug info for processed data
                 if st.session_state.charging_data is not None:
