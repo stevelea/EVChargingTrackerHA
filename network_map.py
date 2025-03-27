@@ -262,7 +262,8 @@ def display_network_map(stations_df, center_lat, center_lon, radius, show_histor
                 # Debug location data
                 print(f"User DataFrame before coordinates: {user_df.shape}")
                 print(f"Location columns: {list(user_df.columns)}")
-                print(f"Sample locations: {user_df['location'].unique()[:5]}")
+                if user_df.shape[0] > 0 and 'location' in user_df.columns:
+                    print(f"Number of unique locations: {len(user_df['location'].unique())}")
                 
                 # Check if coordinates already exist
                 if 'latitude' in user_df.columns and 'longitude' in user_df.columns:
