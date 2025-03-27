@@ -58,6 +58,16 @@ def create_visualizations(data):
     data = calculate_distances(data)
     figures = {}
     
+    # Check which column names are being used (for backwards compatibility)
+    energy_col = 'energy_kwh' if 'energy_kwh' in data.columns else 'total_kwh'
+    cost_col = 'cost' if 'cost' in data.columns else 'total_cost'
+    
+    # Create column mappings for consistency
+    column_mappings = {
+        'total_kwh': energy_col,
+        'total_cost': cost_col
+    }
+    
     # Normalize datetime timezone handling for date column
     if 'date' in data.columns:
         # First ensure the column is datetime
@@ -139,18 +149,19 @@ def create_visualizations(data):
         figures['time_series'] = px.scatter(
             plot_data,  # Use pre-converted data
             x='date',
-            y='total_kwh',
+            y=energy_col,  # Use the correct column name
             size=peak_kw_values,  # Pass as explicit list of numeric values
             color='cost_per_kwh',
             hover_name='location',
-            hover_data=['provider', 'total_cost', 'duration'],
+            hover_data=['provider', cost_col, 'duration'],  # Use the correct column name
             title='Charging Sessions Over Time',
             labels={
                 'date': 'Date',
-                'total_kwh': 'Energy Delivered (kWh)',
+                energy_col: 'Energy Delivered (kWh)',  # Use the correct column name
                 'peak_kw': 'Peak Power (kW)',
                 'cost_per_kwh': 'Cost per kWh ($)',
-                'provider': 'Provider'
+                'provider': 'Provider',
+                cost_col: 'Total Cost ($)'  # Use the correct column name
             },
             color_continuous_scale='Viridis'
         )
@@ -159,16 +170,17 @@ def create_visualizations(data):
         figures['time_series'] = px.scatter(
             plot_data,  # Use pre-converted data
             x='date',
-            y='total_kwh',
+            y=energy_col,  # Use the correct column name
             color='cost_per_kwh',
             hover_name='location',
-            hover_data=['provider', 'total_cost', 'duration'],
+            hover_data=['provider', cost_col, 'duration'],  # Use the correct column name
             title='Charging Sessions Over Time',
             labels={
                 'date': 'Date',
-                'total_kwh': 'Energy Delivered (kWh)',
+                energy_col: 'Energy Delivered (kWh)',  # Use the correct column name
                 'cost_per_kwh': 'Cost per kWh ($)',
-                'provider': 'Provider'
+                'provider': 'Provider',
+                cost_col: 'Total Cost ($)'  # Use the correct column name
             },
             color_continuous_scale='Viridis'
         )
@@ -240,19 +252,19 @@ def create_visualizations(data):
         )
     
     # Energy delivered by location
-    location_kwh = data.groupby('location')['total_kwh'].sum().reset_index()
-    location_kwh = location_kwh.sort_values('total_kwh', ascending=False)
+    location_kwh = data.groupby('location')[energy_col].sum().reset_index()
+    location_kwh = location_kwh.sort_values(energy_col, ascending=False)
     
     figures['kwh_by_location'] = px.bar(
         location_kwh,
         x='location',
-        y='total_kwh',
+        y=energy_col,
         title='Total Energy by Location',
         labels={
             'location': 'Location',
-            'total_kwh': 'Total Energy (kWh)'
+            energy_col: 'Total Energy (kWh)'
         },
-        color='total_kwh',
+        color=energy_col,
         color_continuous_scale='Viridis'
     )
     
@@ -266,11 +278,11 @@ def create_visualizations(data):
     figures['cost_time_series'] = px.line(
         data,
         x='date',
-        y='total_cost',
+        y=cost_col,
         title='Charging Costs Over Time',
         labels={
             'date': 'Date',
-            'total_cost': 'Total Cost ($)'
+            cost_col: 'Total Cost ($)'
         }
     )
     
@@ -306,27 +318,32 @@ def create_visualizations(data):
                 )
                 
                 # Group by the extracted month/year
-                monthly_agg = monthly_data.groupby('month_year').agg({
-                    'total_cost': 'sum',
-                    'total_kwh': 'sum'
-                }).reset_index()
+                agg_dict = {
+                    cost_col: 'sum',
+                    energy_col: 'sum'
+                }
+                monthly_agg = monthly_data.groupby('month_year').agg(agg_dict).reset_index()
                 
                 # Rename column for consistency
                 monthly_agg = monthly_agg.rename(columns={'month_year': 'month'})
+                
+                # Ensure we have 'total_cost' for compatibility with older code
+                if 'total_cost' not in monthly_agg.columns:
+                    monthly_agg['total_cost'] = monthly_agg[cost_col]
             except Exception as e:
                 # Fallback if date conversion fails
                 print(f"Error in monthly aggregation: {str(e)}")
                 monthly_agg = pd.DataFrame({
                     'month': [data['date'].min()],  # Use min date as a fallback
-                    'total_cost': [data['total_cost'].sum()],
-                    'total_kwh': [data['total_kwh'].sum()]
+                    'total_cost': [data[cost_col].sum()],
+                    energy_col: [data[energy_col].sum()]
                 })
         else:
             # Fallback if no date column
             monthly_agg = pd.DataFrame({
                 'month': [pd.Timestamp.now()],
-                'total_cost': [data['total_cost'].sum()],
-                'total_kwh': [data['total_kwh'].sum()]
+                'total_cost': [data[cost_col].sum()],
+                energy_col: [data[energy_col].sum()]
             })
     except Exception as e:
         # Last-resort fallback
@@ -350,7 +367,7 @@ def create_visualizations(data):
     
     # Cost per kWh over time
     # Convert size parameter explicitly and ensure it's properly converted to numeric values
-    total_kwh_values = data['total_kwh'].apply(lambda x: float(x) if pd.notnull(x) else 5.0).tolist()
+    total_kwh_values = data[energy_col].apply(lambda x: float(x) if pd.notnull(x) else 5.0).tolist()
     
     figures['cost_per_kwh'] = px.scatter(
         plot_data,  # Use pre-converted data
@@ -376,7 +393,7 @@ def create_visualizations(data):
     # Charging duration analysis
     # Convert size parameter to list and ensure it contains proper numeric values
     total_cost_values = []
-    for val in data['total_cost']:
+    for val in data[cost_col]:
         try:
             if pd.notnull(val) and val != 0:
                 total_cost_values.append(float(val))
@@ -452,25 +469,32 @@ def create_visualizations(data):
     )
     
     # Cost by location
-    location_cost = data.groupby('location').agg({
-        'total_cost': 'sum',
-        'total_kwh': 'sum'
-    }).reset_index()
-    location_cost['avg_cost_per_kwh'] = location_cost['total_cost'] / location_cost['total_kwh']
-    location_cost = location_cost.sort_values('total_cost', ascending=False)
+    agg_dict = {
+        cost_col: 'sum',
+        energy_col: 'sum'
+    }
+    location_cost = data.groupby('location').agg(agg_dict).reset_index()
+    location_cost['avg_cost_per_kwh'] = location_cost[cost_col] / location_cost[energy_col]
+    location_cost = location_cost.sort_values(cost_col, ascending=False)
+    
+    # Ensure we have 'total_cost' and 'total_kwh' for compatibility with older code
+    if 'total_cost' not in location_cost.columns:
+        location_cost['total_cost'] = location_cost[cost_col]
+    if 'total_kwh' not in location_cost.columns:
+        location_cost['total_kwh'] = location_cost[energy_col]
     
     figures['cost_by_location'] = px.bar(
         location_cost,
         x='location',
-        y='total_cost',
+        y=cost_col,
         title='Total Cost by Location',
         labels={
             'location': 'Location',
-            'total_cost': 'Total Cost ($)'
+            cost_col: 'Total Cost ($)'
         },
         color='avg_cost_per_kwh',
         color_continuous_scale='RdYlGn_r',
-        hover_data=['total_kwh', 'avg_cost_per_kwh']
+        hover_data=[energy_col, 'avg_cost_per_kwh']
     )
     
     figures['cost_by_location'].update_layout(
@@ -482,33 +506,40 @@ def create_visualizations(data):
     # Provider comparison - added for Tesla API integration
     if 'provider' in data.columns and len(data['provider'].unique()) > 1:
         # Group by provider for comparison
-        provider_stats = data.groupby('provider').agg({
-            'total_cost': 'sum',
-            'total_kwh': 'sum',
+        agg_dict = {
+            cost_col: 'sum',
+            energy_col: 'sum',
             'peak_kw': 'mean',
             'date': 'count'  # Count of sessions
-        }).reset_index()
+        }
+        provider_stats = data.groupby('provider').agg(agg_dict).reset_index()
         
         # Calculate average cost per kWh for each provider
-        provider_stats['avg_cost_per_kwh'] = provider_stats['total_cost'] / provider_stats['total_kwh']
+        provider_stats['avg_cost_per_kwh'] = provider_stats[cost_col] / provider_stats[energy_col]
         provider_stats = provider_stats.rename(columns={'date': 'sessions'})
         
+        # Ensure we have 'total_cost' and 'total_kwh' for compatibility with older code
+        if 'total_cost' not in provider_stats.columns:
+            provider_stats['total_cost'] = provider_stats[cost_col]
+        if 'total_kwh' not in provider_stats.columns:
+            provider_stats['total_kwh'] = provider_stats[energy_col]
+        
         # Sort by total cost
-        provider_stats = provider_stats.sort_values('total_cost', ascending=False)
+        provider_stats = provider_stats.sort_values(cost_col, ascending=False)
         
         # Create cost comparison chart
         figures['provider_cost_comparison'] = px.bar(
             provider_stats,
             x='provider',
-            y='total_cost',
+            y=cost_col,
             title='Cost Comparison by Provider',
             labels={
                 'provider': 'Provider',
-                'total_cost': 'Total Cost ($)'
+                cost_col: 'Total Cost ($)'
             },
             color='avg_cost_per_kwh',
             color_continuous_scale='RdYlGn_r',
-            hover_data=['total_kwh', 'avg_cost_per_kwh', 'sessions']
+            hover_data=[energy_col, 'avg_cost_per_kwh', 'sessions']
         )
         
         figures['provider_cost_comparison'].update_layout(
@@ -524,11 +555,11 @@ def create_visualizations(data):
                 figures['provider_kwh_comparison'] = px.bar(
                     provider_stats,
                     x='provider',
-                    y='total_kwh',
+                    y=energy_col,
                     title='Energy Delivered by Provider',
                     labels={
                         'provider': 'Provider', 
-                        'total_kwh': 'Total Energy (kWh)'
+                        energy_col: 'Total Energy (kWh)'
                     },
                     color='peak_kw',
                     color_continuous_scale='Viridis',
@@ -539,11 +570,11 @@ def create_visualizations(data):
                 figures['provider_kwh_comparison'] = px.bar(
                     provider_stats,
                     x='provider',
-                    y='total_kwh',
+                    y=energy_col,
                     title='Energy Delivered by Provider',
                     labels={
                         'provider': 'Provider', 
-                        'total_kwh': 'Total Energy (kWh)'
+                        energy_col: 'Total Energy (kWh)'
                     },
                     color='avg_cost_per_kwh',  # Use cost instead of peak_kw
                     color_continuous_scale='RdYlGn_r',
@@ -555,11 +586,11 @@ def create_visualizations(data):
             figures['provider_kwh_comparison'] = px.bar(
                 provider_stats,
                 x='provider',
-                y='total_kwh',
+                y=energy_col,
                 title='Energy Delivered by Provider',
                 labels={
                     'provider': 'Provider', 
-                    'total_kwh': 'Total Energy (kWh)'
+                    energy_col: 'Total Energy (kWh)'
                 },
                 hover_data=['sessions', 'avg_cost_per_kwh']
             )
@@ -604,17 +635,17 @@ def create_visualizations(data):
                     efficiency_data.sort_values('date'),
                     x='date',
                     y='kwh_per_km',
-                    size='total_kwh',
+                    size=energy_col,
                     color='provider',
                     hover_name='location',
-                    hover_data=['distance', 'total_kwh'],
+                    hover_data=['distance', energy_col],
                     title='Energy Efficiency Over Time (kWh per km)',
                     labels={
                         'date': 'Date',
                         'kwh_per_km': 'Energy Consumption (kWh/km)',
                         'provider': 'Provider',
                         'distance': 'Distance (km)',
-                        'total_kwh': 'Energy (kWh)'
+                        energy_col: 'Energy (kWh)'
                     }
                 )
                 
@@ -650,17 +681,17 @@ def create_visualizations(data):
                     cost_per_km_data.sort_values('date'),
                     x='date',
                     y='cost_per_km',
-                    size='total_cost',
+                    size=cost_col,
                     color='provider',
                     hover_name='location',
-                    hover_data=['distance', 'total_cost'],
+                    hover_data=['distance', cost_col],
                     title='Cost Efficiency Over Time ($ per km)',
                     labels={
                         'date': 'Date',
                         'cost_per_km': 'Cost per km ($)',
                         'provider': 'Provider',
                         'distance': 'Distance (km)',
-                        'total_cost': 'Total Cost ($)'
+                        cost_col: 'Total Cost ($)'
                     }
                 )
                 
