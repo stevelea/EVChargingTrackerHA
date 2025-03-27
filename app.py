@@ -47,14 +47,32 @@ if 'charging_data' not in st.session_state:
     if os.environ.get('ENABLE_TEST_DATA', 'false').lower() == 'true':
         # Create test data for the network map feature
         try:
-            charging_data = create_test_data.create_sample_charging_data()
-            # Load the test data
-            email_address = st.session_state.get('email_address', 'test@example.com')
+            # Create and load the test data
+            create_test_data.create_sample_charging_data()
+            email_address = 'test@example.com'
+            st.session_state.email_address = email_address
             test_data = load_charging_data(email_address)
+            
+            # Debug info
+            print(f"Loaded {len(test_data)} test records")
+            if test_data and len(test_data) > 0:
+                print(f"Sample record: {test_data[0]}")
+            
             if test_data:
                 st.session_state.charging_data = clean_charging_data(test_data)
                 st.session_state.current_user_email = email_address
                 st.session_state.authenticated = True  # Auto-authenticate for testing
+                
+                # Debug info for processed data
+                if st.session_state.charging_data is not None:
+                    print(f"Processed {len(st.session_state.charging_data)} records into DataFrame")
+                    if not st.session_state.charging_data.empty:
+                        print(f"Sample DataFrame columns: {list(st.session_state.charging_data.columns)}")
+                        # Check if location data exists
+                        if 'latitude' in st.session_state.charging_data.columns:
+                            null_lat = st.session_state.charging_data['latitude'].isnull().sum()
+                            print(f"Records with null latitude: {null_lat} out of {len(st.session_state.charging_data)}")
+                
         except Exception as e:
             print(f"Error generating test data: {str(e)}")
 

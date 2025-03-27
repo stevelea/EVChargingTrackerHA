@@ -182,18 +182,25 @@ def calculate_statistics(data):
     stats['unique_locations'] = data['location'].nunique()
     
     # Energy statistics
-    stats['total_kwh'] = data['total_kwh'].sum()
-    stats['avg_kwh_per_session'] = data['total_kwh'].mean()
-    stats['max_kwh_session'] = data['total_kwh'].max()
+    # Handle both energy_kwh and total_kwh column names for backward compatibility
+    energy_col = 'energy_kwh' if 'energy_kwh' in data.columns else 'total_kwh'
+    stats['total_kwh'] = data[energy_col].sum()
+    stats['avg_kwh_per_session'] = data[energy_col].mean()
+    stats['max_kwh_session'] = data[energy_col].max()
     
     # Cost statistics
-    stats['total_cost'] = data['total_cost'].sum()
-    stats['avg_cost_per_session'] = data['total_cost'].mean()
+    cost_col = 'cost' if 'cost' in data.columns else 'total_cost'  
+    stats['total_cost'] = data[cost_col].sum()
+    stats['avg_cost_per_session'] = data[cost_col].mean()
     stats['avg_cost_per_kwh'] = stats['total_cost'] / stats['total_kwh'] if stats['total_kwh'] > 0 else 0
     
-    # Power statistics
-    stats['avg_peak_kw'] = data['peak_kw'].mean()
-    stats['max_peak_kw'] = data['peak_kw'].max()
+    # Power statistics if available
+    if 'peak_kw' in data.columns:
+        stats['avg_peak_kw'] = data['peak_kw'].mean()
+        stats['max_peak_kw'] = data['peak_kw'].max()
+    else:
+        stats['avg_peak_kw'] = 0
+        stats['max_peak_kw'] = 0
     
     # Time statistics
     if 'date' in data.columns:
@@ -204,10 +211,15 @@ def calculate_statistics(data):
         # Monthly aggregates
         monthly_data = data.copy()
         monthly_data['month'] = monthly_data['date'].dt.to_period('M')
+        
+        # Use the same column names for aggregation
         monthly_agg = monthly_data.groupby('month').agg({
-            'total_cost': 'sum',
-            'total_kwh': 'sum'
+            cost_col: 'sum',
+            energy_col: 'sum'
         })
+        
+        # Rename columns for consistency with the rest of the stats
+        monthly_agg.columns = ['total_cost', 'total_kwh']
         
         stats['monthly_avg_cost'] = monthly_agg['total_cost'].mean()
         stats['monthly_avg_kwh'] = monthly_agg['total_kwh'].mean()

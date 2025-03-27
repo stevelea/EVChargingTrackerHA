@@ -53,25 +53,46 @@ def get_location_coordinates(df):
     Returns:
         DataFrame: Original DataFrame with 'latitude' and 'longitude' columns added
     """
+    # Check if the DataFrame already has coordinates that we can use
+    coords_exist = False
+    if 'latitude' in df.columns and 'longitude' in df.columns:
+        # Count non-null coordinates
+        valid_coords = (~df['latitude'].isna() & ~df['longitude'].isna()).sum()
+        if valid_coords > 0:
+            print(f"Using {valid_coords} existing coordinates from {df.shape[0]} records")
+            coords_exist = True
+    
     # Create a copy of the DataFrame to avoid modifying the original
     result_df = df.copy()
     
-    # Add empty latitude and longitude columns
+    # Add empty latitude and longitude columns if they don't exist
     if 'latitude' not in result_df.columns:
         result_df['latitude'] = None
     if 'longitude' not in result_df.columns:
         result_df['longitude'] = None
     
-    # Get unique locations
-    unique_locations = result_df['location'].dropna().unique()
+    # If we already have coordinates for all records, return early
+    if coords_exist and valid_coords == df.shape[0]:
+        return result_df
     
     # Create a geocoding cache
     if 'geocoding_cache' not in st.session_state:
         st.session_state.geocoding_cache = {}
     
-    # Geocode each unique location
+    # Get unique locations that need geocoding (those without coordinates)
+    if coords_exist:
+        # Only get locations for rows without valid coordinates
+        missing_coords = result_df[result_df['latitude'].isna() | result_df['longitude'].isna()]
+        unique_locations = missing_coords['location'].dropna().unique()
+        print(f"Need to geocode {len(unique_locations)} locations with missing coordinates")
+    else:
+        # Get all unique locations
+        unique_locations = result_df['location'].dropna().unique()
+        print(f"Need to geocode {len(unique_locations)} unique locations")
+    
+    # Geocode each unique location not already in cache
     for location in unique_locations:
-        # Skip empty or "Garage" locations for now (can be customized later)
+        # Skip empty locations or those already in cache
         if not location or location.lower() in st.session_state.geocoding_cache:
             continue
             
@@ -82,12 +103,21 @@ def get_location_coordinates(df):
         st.session_state.geocoding_cache[location.lower()] = coords
     
     # Apply coordinates from cache to DataFrame
+    coords_applied = 0
     for i, row in result_df.iterrows():
+        # Skip if row already has valid coordinates
+        if coords_exist and pd.notna(row['latitude']) and pd.notna(row['longitude']):
+            continue
+            
+        # Apply coordinates from cache if available
         if pd.notna(row['location']) and row['location'].lower() in st.session_state.geocoding_cache:
             coords = st.session_state.geocoding_cache[row['location'].lower()]
             if coords:
                 result_df.at[i, 'latitude'] = coords[0]
                 result_df.at[i, 'longitude'] = coords[1]
+                coords_applied += 1
+    
+    print(f"Applied {coords_applied} coordinates from cache")
     
     return result_df
 

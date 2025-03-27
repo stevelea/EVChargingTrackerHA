@@ -259,8 +259,20 @@ def display_network_map(stations_df, center_lat, center_lon, radius, show_histor
                 # Convert to DataFrame
                 user_df = data_storage.convert_to_dataframe(charging_data)
                 
-                # Get location coordinates
-                user_df_with_coords = location_mapper.get_location_coordinates(user_df)
+                # Debug location data
+                print(f"User DataFrame before coordinates: {user_df.shape}")
+                print(f"Location columns: {list(user_df.columns)}")
+                print(f"Sample locations: {user_df['location'].unique()[:5]}")
+                
+                # Check if coordinates already exist
+                if 'latitude' in user_df.columns and 'longitude' in user_df.columns:
+                    # Count non-null coordinates
+                    has_coords = user_df[~user_df['latitude'].isna()].shape[0]
+                    print(f"Records with coordinates already: {has_coords} out of {user_df.shape[0]}")
+                    user_df_with_coords = user_df
+                else:
+                    # Get location coordinates
+                    user_df_with_coords = location_mapper.get_location_coordinates(user_df)
                 
                 # Create a separate layer for user's charging history
                 history_group = folium.FeatureGroup(name="Your Charging History")
@@ -269,6 +281,10 @@ def display_network_map(stations_df, center_lat, center_lon, radius, show_histor
                 history_count = 0
                 
                 for idx, record in user_df_with_coords.iterrows():
+                    # Debug: print a few sample records
+                    if idx < 3:
+                        print(f"Record {idx}: lat={record.get('latitude')}, lon={record.get('longitude')}, loc={record.get('location')}")
+                    
                     # Skip records without coordinates
                     if pd.isna(record.get('latitude')) or pd.isna(record.get('longitude')):
                         continue
