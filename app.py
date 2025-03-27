@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import plotly.express as px
 import plotly.graph_objects as go
 import urllib.parse
@@ -218,8 +218,75 @@ with st.sidebar:
             st.session_state.tesla_client = TeslaApiClient()  # Reset the client
             st.rerun()
     
-    # Data retrieval section (only show if authenticated)
+    # Database Cleaning section (only show if authenticated)
     if st.session_state.authenticated:
+        st.subheader("Database Management")
+        
+        # Show currently stored data info
+        stored_data = load_charging_data(st.session_state.current_user_email)
+        if stored_data:
+            st.info(f"You have {len(stored_data)} charging sessions stored in the database.")
+            
+            # Quick cleaning section (direct access)
+            st.write("Clean Database (Fix EVCC Duplicates):")
+            clean_evcc_only = st.checkbox(
+                "Clean only EVCC data", 
+                value=True,
+                key="sidebar_clean_evcc_only",
+                help="When checked, only EVCC CSV data will be deduplicated. Otherwise, all data sources will be cleaned."
+            )
+            
+            # Option to run cleaning process
+            if st.button("Clean Database Now", type="primary", key="sidebar_clean_db"):
+                with st.spinner("Cleaning database..."):
+                    # Load existing data
+                    existing_data = load_charging_data(st.session_state.current_user_email)
+                    
+                    if not existing_data:
+                        st.warning("No data to clean.")
+                    else:
+                        # Count original records
+                        original_count = len(existing_data)
+                        
+                        # Initialize cleaned data list with seen_ids to track duplicates
+                        cleaned_data = []
+                        seen_ids = set()
+                        
+                        # Filter by source if EVCC only option is selected
+                        for record in existing_data:
+                            # Skip record if it's EVCC and we're cleaning EVCC only
+                            # or if we're cleaning all data
+                            if (clean_evcc_only and record.get('source') == 'EVCC CSV') or not clean_evcc_only:
+                                # Generate a new ID based on current algorithm
+                                record_id = generate_record_id(record)
+                                
+                                # Only keep the record if we haven't seen this ID before
+                                if record_id not in seen_ids:
+                                    # Force update the ID
+                                    record['id'] = record_id
+                                    cleaned_data.append(record)
+                                    seen_ids.add(record_id)
+                            else:
+                                # Keep non-EVCC records as they are if EVCC only option is selected
+                                cleaned_data.append(record)
+                        
+                        # Save the cleaned data
+                        save_charging_data(cleaned_data, st.session_state.current_user_email)
+                        
+                        # Report results
+                        removed_count = original_count - len(cleaned_data)
+                        if removed_count > 0:
+                            st.success(f"Successfully removed {removed_count} duplicate records.")
+                            
+                            # Update main data
+                            st.session_state.charging_data = clean_charging_data(cleaned_data)
+                            st.rerun()
+                        else:
+                            st.info("No duplicate records found.")
+        else:
+            st.info("No charging data is currently stored in the database.")
+                
+        # Data retrieval section
         st.subheader("Data Retrieval")
         
         # Create tabs for different data sources
@@ -632,7 +699,12 @@ with st.sidebar:
                                 if email['date']:
                                     # Make naive datetime for comparison (remove timezone info)
                                     email_date = email['date'].replace(tzinfo=None)
-                                    if start_date <= email_date <= end_date:
+                                    
+                                    # Convert date objects to datetime for comparison
+                                    start_datetime = datetime.combine(start_date, datetime.min.time()) if isinstance(start_date, date) else start_date
+                                    end_datetime = datetime.combine(end_date, datetime.max.time()) if isinstance(end_date, date) else end_date
+                                    
+                                    if start_datetime <= email_date <= end_datetime:
                                         filtered_emails.append(email)
                             
                             emails_count = len(filtered_emails)
