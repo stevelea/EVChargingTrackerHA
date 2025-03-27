@@ -96,6 +96,9 @@ if 'dashboard_preferences' not in st.session_state:
             'monthly_cost_forecast': {'visible': True, 'order': 10, 'name': 'Monthly Cost Forecast'},
             'provider_trend_prediction': {'visible': True, 'order': 11, 'name': 'Provider Cost Trends'},
             'usage_prediction': {'visible': True, 'order': 12, 'name': 'Usage Prediction'},
+            'odometer_time_series': {'visible': True, 'order': 13, 'name': 'Odometer Readings Over Time'},
+            'energy_efficiency': {'visible': True, 'order': 14, 'name': 'Energy Efficiency (kWh per km)'},
+            'cost_per_km': {'visible': True, 'order': 15, 'name': 'Cost Efficiency ($ per km)'},
         },
         'layout': 'tabs',  # 'tabs' or 'grid'
         'grid_columns': 2   # Number of columns if using grid layout
@@ -426,7 +429,7 @@ with st.sidebar:
                                     st.info("No duplicate records found.")
                 
                 # Data Management Tabs
-                data_mgmt_tabs = st.tabs(["Selective Delete", "Delete All"])
+                data_mgmt_tabs = st.tabs(["Selective Delete", "Odometer Updates", "Delete All"])
                 
                 # Selective Delete Tab
                 with data_mgmt_tabs[0]:
@@ -587,8 +590,166 @@ with st.sidebar:
                     else:
                         st.warning("No records found matching your criteria.")
                 
-                # Delete All Tab
+                # Odometer Updates Tab
                 with data_mgmt_tabs[1]:
+                    st.subheader("Update Odometer Readings")
+                    st.write("Manually update the odometer reading for each charging session.")
+                    
+                    # Initialize session state for odometer updates
+                    if 'records_for_odometer' not in st.session_state:
+                        st.session_state.records_for_odometer = stored_data
+                    
+                    # Filter options for finding sessions
+                    filter_col1, filter_col2 = st.columns(2)
+                    
+                    with filter_col1:
+                        # Get unique providers
+                        providers = ["All"] + sorted(set(record.get('provider', 'Unknown') for record in stored_data))
+                        selected_provider = st.selectbox("Filter by Provider:", providers, key="odometer_provider_filter")
+                    
+                    with filter_col2:
+                        # Get unique locations
+                        locations = ["All"] + sorted(set(record.get('location', 'Unknown') for record in stored_data if record.get('location')))
+                        selected_location = st.selectbox("Filter by Location:", locations, key="odometer_location_filter")
+                    
+                    # Date range filter
+                    min_date = min((record.get('date') for record in stored_data if record.get('date')), default=datetime.now() - timedelta(days=365))
+                    max_date = max((record.get('date') for record in stored_data if record.get('date')), default=datetime.now())
+                    
+                    date_col1, date_col2 = st.columns(2)
+                    with date_col1:
+                        start_date = st.date_input("From Date:", min_date, key="odometer_start_date")
+                    with date_col2:
+                        end_date = st.date_input("To Date:", max_date, key="odometer_end_date")
+                    
+                    # Create criteria dictionary for filtering
+                    filter_criteria = {}
+                    
+                    if selected_provider != "All":
+                        filter_criteria['provider'] = selected_provider
+                    
+                    if selected_location != "All":
+                        filter_criteria['location'] = selected_location
+                    
+                    # Add date range
+                    if start_date and end_date:
+                        # Convert to datetime for consistent comparison
+                        start_datetime = datetime.combine(start_date, datetime.min.time())
+                        end_datetime = datetime.combine(end_date, datetime.max.time())
+                        filter_criteria['date_range'] = (start_datetime, end_datetime)
+                    
+                    # Apply filters button
+                    if st.button("Find Sessions", key="find_odometer_sessions"):
+                        # Apply the filters
+                        st.session_state.records_for_odometer = filter_records_by_criteria(filter_criteria, st.session_state.current_user_email)
+                        st.success(f"Found {len(st.session_state.records_for_odometer)} records matching your criteria.")
+                    
+                    # Display records with editable odometer fields
+                    if st.session_state.records_for_odometer:
+                        st.write("Enter odometer readings for each session:")
+                        
+                        # Sort records by date for easier entry
+                        sorted_records = sorted(
+                            st.session_state.records_for_odometer, 
+                            key=lambda x: x.get('date', datetime.now()) if x.get('date') else datetime.now()
+                        )
+                        
+                        # Process records in chunks for pagination
+                        records_per_page = 10
+                        total_pages = (len(sorted_records) + records_per_page - 1) // records_per_page
+                        
+                        # Page selector
+                        if total_pages > 1:
+                            page = st.number_input("Page", min_value=1, max_value=total_pages, value=1, key="odometer_page")
+                        else:
+                            page = 1
+                            
+                        # Get the current page data
+                        start_idx = (page - 1) * records_per_page
+                        end_idx = min(start_idx + records_per_page, len(sorted_records))
+                        
+                        # Create a form for bulk updates
+                        with st.form("odometer_update_form"):
+                            # Store updates in a dictionary
+                            odometer_updates = {}
+                            
+                            for i, record in enumerate(sorted_records[start_idx:end_idx]):
+                                record_id = record.get('id', '')
+                                date_str = record.get('date', '')
+                                if isinstance(date_str, datetime):
+                                    date_str = date_str.strftime('%Y-%m-%d')
+                                
+                                location = record.get('location', 'Unknown')
+                                provider = record.get('provider', 'Unknown')
+                                current_odometer = record.get('odometer', None)
+                                
+                                st.markdown(f"**{date_str}** | {provider} | {location}")
+                                
+                                # Use string format of the odometer for the input field
+                                current_odometer_str = str(current_odometer) if current_odometer is not None else ""
+                                
+                                # Create an input field for this record
+                                new_odometer = st.text_input(
+                                    f"Odometer reading (km):",
+                                    value=current_odometer_str,
+                                    key=f"odometer_{record_id}_{i}"
+                                )
+                                
+                                # Store the update if the field is not empty
+                                if new_odometer.strip():
+                                    try:
+                                        # Try to convert to number
+                                        odometer_value = float(new_odometer)
+                                        # Only store if different from current value
+                                        if current_odometer is None or odometer_value != current_odometer:
+                                            odometer_updates[record_id] = odometer_value
+                                    except ValueError:
+                                        st.error(f"Invalid odometer value: {new_odometer}. Please enter a number.")
+                                
+                                st.markdown("---")
+                            
+                            # Submit button for the form
+                            submit_button = st.form_submit_button("Save Odometer Readings")
+                            
+                            # Process form submission
+                            if submit_button and odometer_updates:
+                                # Load existing data
+                                existing_data = load_charging_data(st.session_state.current_user_email)
+                                updated_count = 0
+                                
+                                # Update odometer values
+                                for record in existing_data:
+                                    record_id = record.get('id', '')
+                                    if record_id in odometer_updates:
+                                        record['odometer'] = odometer_updates[record_id]
+                                        updated_count += 1
+                                
+                                # Save updated data
+                                if updated_count > 0:
+                                    save_charging_data(existing_data, st.session_state.current_user_email)
+                                    # Update main data
+                                    st.session_state.charging_data = clean_charging_data(existing_data)
+                                    st.success(f"Successfully updated odometer readings for {updated_count} records.")
+                                    # Force refresh
+                                    st.rerun()
+                                else:
+                                    st.info("No odometer readings were changed.")
+                    else:
+                        st.info("No records found matching your criteria or no data available.")
+                    
+                    # Tips section
+                    with st.expander("Tips for entering odometer readings"):
+                        st.markdown("""
+                        ### Tips for accurate odometer readings:
+                        
+                        - Enter the odometer reading as displayed on your vehicle when charging
+                        - Use consistent units (kilometers recommended)
+                        - For best distance calculations between charges, enter readings for consecutive charging sessions
+                        - The system will automatically calculate distance traveled between charging sessions when odometer readings are available
+                        """)
+                
+                # Delete All Tab
+                with data_mgmt_tabs[2]:
                     st.subheader("Delete All Data")
                     st.warning("This will permanently delete all your stored charging data. This action cannot be undone.")
                     

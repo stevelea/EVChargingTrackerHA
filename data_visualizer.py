@@ -4,6 +4,42 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
+def calculate_distances(data):
+    """
+    Calculate distances traveled between charging sessions based on odometer readings
+    
+    Args:
+        data: DataFrame containing charging data with odometer column
+        
+    Returns:
+        DataFrame with additional distance column
+    """
+    # Check if there are any odometer readings
+    if 'odometer' not in data.columns or data['odometer'].isna().all():
+        # No odometer data available
+        return data
+    
+    # Make a copy of the dataframe to avoid modifying the original
+    df = data.copy()
+    
+    # Ensure the data is sorted by date
+    df = df.sort_values('date')
+    
+    # Calculate the distance traveled since last charge
+    df['distance'] = df['odometer'].diff()
+    
+    # Replace negative values with NaN (happens if odometer readings aren't in sequence)
+    df.loc[df['distance'] < 0, 'distance'] = np.nan
+    
+    # Calculate cost per km where possible
+    df['cost_per_km'] = df['total_cost'] / df['distance']
+    df['kwh_per_km'] = df['total_kwh'] / df['distance']
+    
+    # Replace infinite values with NaN
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    
+    return df
+
 def create_visualizations(data):
     """
     Create interactive visualizations of the charging data
@@ -14,6 +50,8 @@ def create_visualizations(data):
     Returns:
         Dictionary of plotly figures
     """
+    # Calculate distances if odometer data is available
+    data = calculate_distances(data)
     figures = {}
     
     # Normalize datetime timezone handling for date column
@@ -523,5 +561,120 @@ def create_visualizations(data):
         )
         
         # Add to dashboard preferences in the app (this will be handled in app.py)
+    
+    # Add odometer and efficiency visualizations if data is available
+    # First, check if we have odometer and distance columns
+    if 'odometer' in data.columns and data['odometer'].notna().any():
+        # Odometer readings over time
+        figures['odometer_time_series'] = px.line(
+            data.sort_values('date'),
+            x='date',
+            y='odometer',
+            title='Odometer Readings Over Time',
+            labels={
+                'date': 'Date',
+                'odometer': 'Odometer Reading (km)'
+            },
+            markers=True
+        )
+        
+        figures['odometer_time_series'].update_layout(
+            xaxis_title='Date',
+            yaxis_title='Odometer Reading (km)'
+        )
+        
+        # If we have calculated distances between charges
+        if 'distance' in data.columns and data['distance'].notna().any():
+            # Energy efficiency visualization (kWh per km)
+            efficiency_data = data[data['kwh_per_km'].notna() & 
+                                  (data['kwh_per_km'] > 0) & 
+                                  (data['kwh_per_km'] < 1)]  # Filter out extreme outliers
+            
+            if len(efficiency_data) > 0:
+                figures['energy_efficiency'] = px.scatter(
+                    efficiency_data.sort_values('date'),
+                    x='date',
+                    y='kwh_per_km',
+                    size='total_kwh',
+                    color='provider',
+                    hover_name='location',
+                    hover_data=['distance', 'total_kwh'],
+                    title='Energy Efficiency Over Time (kWh per km)',
+                    labels={
+                        'date': 'Date',
+                        'kwh_per_km': 'Energy Consumption (kWh/km)',
+                        'provider': 'Provider',
+                        'distance': 'Distance (km)',
+                        'total_kwh': 'Energy (kWh)'
+                    }
+                )
+                
+                # Add a rolling average line
+                if len(efficiency_data) >= 3:  # Need at least 3 points for moving average
+                    # Sort by date for proper rolling average
+                    eff_sorted = efficiency_data.sort_values('date')
+                    eff_sorted['rolling_efficiency'] = eff_sorted['kwh_per_km'].rolling(
+                        window=3, min_periods=1).mean()
+                    
+                    figures['energy_efficiency'].add_trace(
+                        go.Scatter(
+                            x=eff_sorted['date'],
+                            y=eff_sorted['rolling_efficiency'],
+                            mode='lines',
+                            name='3-point Moving Avg',
+                            line=dict(color='red', width=2)
+                        )
+                    )
+                
+                figures['energy_efficiency'].update_layout(
+                    xaxis_title='Date',
+                    yaxis_title='Energy Consumption (kWh/km)'
+                )
+            
+            # Cost per km visualization
+            cost_per_km_data = data[data['cost_per_km'].notna() & 
+                                   (data['cost_per_km'] > 0) & 
+                                   (data['cost_per_km'] < 1)]  # Filter outliers
+            
+            if len(cost_per_km_data) > 0:
+                figures['cost_per_km'] = px.scatter(
+                    cost_per_km_data.sort_values('date'),
+                    x='date',
+                    y='cost_per_km',
+                    size='total_cost',
+                    color='provider',
+                    hover_name='location',
+                    hover_data=['distance', 'total_cost'],
+                    title='Cost Efficiency Over Time ($ per km)',
+                    labels={
+                        'date': 'Date',
+                        'cost_per_km': 'Cost per km ($)',
+                        'provider': 'Provider',
+                        'distance': 'Distance (km)',
+                        'total_cost': 'Total Cost ($)'
+                    }
+                )
+                
+                # Add a rolling average line
+                if len(cost_per_km_data) >= 3:  # Need at least 3 points for moving average
+                    # Sort by date for proper rolling average
+                    cost_sorted = cost_per_km_data.sort_values('date')
+                    cost_sorted['rolling_cost_per_km'] = cost_sorted['cost_per_km'].rolling(
+                        window=3, min_periods=1).mean()
+                    
+                    figures['cost_per_km'].add_trace(
+                        go.Scatter(
+                            x=cost_sorted['date'],
+                            y=cost_sorted['rolling_cost_per_km'],
+                            mode='lines',
+                            name='3-point Moving Avg',
+                            line=dict(color='red', width=2)
+                        )
+                    )
+                
+                figures['cost_per_km'].update_layout(
+                    xaxis_title='Date',
+                    yaxis_title='Cost per km ($)'
+                )
     
     return figures
