@@ -246,7 +246,7 @@ def generate_sample_stations(center_lat, center_lon, radius):
             "AddressInfo": {
                 "Title": f"{operator} Charging Station #{i+1}",
                 "AddressLine1": f"{random.randint(1, 100)} {random.choice(['Main', 'Park', 'Elizabeth', 'George', 'Collins', 'King', 'William', 'Pitt', 'Queen', 'Market'])} {random.choice(['Street', 'Road', 'Avenue', 'Boulevard', 'Lane', 'Drive'])}",
-                "Town": random.choice(['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Canberra', 'Darwin', 'Hobart', 'Newcastle', 'Wollongong', 'Gold Coast']),
+                "Town": random.choice(['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Canberra', 'Darwin', 'Hobart', 'Newcastle', 'Wollongong', 'Gold Coast', 'Geelong', 'Townsville', 'Cairns', 'Toowoomba', 'Ballarat', 'Bendigo', 'Albury', 'Mandurah', 'Bunbury']),
                 "StateOrProvince": random.choice(['NSW', 'VIC', 'QLD', 'WA', 'SA', 'ACT', 'NT', 'TAS']),
                 "Postcode": f"{random.randint(2000, 6999)}",
                 "CountryID": 13,  # Australia

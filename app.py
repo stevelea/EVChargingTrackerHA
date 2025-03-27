@@ -24,6 +24,9 @@ from predictive_analysis import (
 )
 from network_map import display_charging_network_map
 
+# Import test data creator
+import create_test_data
+
 # Set page configuration
 st.set_page_config(
     page_title="EV Charging Data Analyzer",
@@ -39,6 +42,21 @@ if 'charging_data' not in st.session_state:
     
     # We'll load data once the user is authenticated
     # This keeps data separate for each user
+    
+    # Generate test data for development/testing
+    if os.environ.get('ENABLE_TEST_DATA', 'false').lower() == 'true':
+        # Create test data for the network map feature
+        try:
+            charging_data = create_test_data.create_sample_charging_data()
+            # Load the test data
+            email_address = st.session_state.get('email_address', 'test@example.com')
+            test_data = load_charging_data(email_address)
+            if test_data:
+                st.session_state.charging_data = clean_charging_data(test_data)
+                st.session_state.current_user_email = email_address
+                st.session_state.authenticated = True  # Auto-authenticate for testing
+        except Exception as e:
+            print(f"Error generating test data: {str(e)}")
 
 # Function to load user data
 def load_user_data(email_address=None):

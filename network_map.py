@@ -9,6 +9,8 @@ from streamlit_folium import folium_static
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import data_storage
+import location_mapper
 
 from charging_network import (
     get_charging_stations, 
@@ -40,6 +42,10 @@ def display_charging_network_map():
             latitude = st.number_input("Latitude", value=default_lat, format="%.4f")
             longitude = st.number_input("Longitude", value=default_lon, format="%.4f")
             radius = st.slider("Search Radius (km)", min_value=1, max_value=50, value=10)
+            
+            # Option to show user's historical charging locations
+            show_history = st.checkbox("Show my charging history", value=True, 
+                                     help="Display your actual charging locations from your history")
             
             # Save in session state
             st.session_state.map_latitude = latitude
@@ -142,19 +148,23 @@ def display_charging_network_map():
                         stations_df = st.session_state.charging_map_data
                     
                     # Always display the map, even if it's using generated sample data
-                    display_network_map(stations_df, latitude, longitude, radius)
+                    # Get user email from session state if available
+                    email_address = st.session_state.get('email_address', None)
+                    display_network_map(stations_df, latitude, longitude, radius, show_history, email_address)
             else:
                 # Show an initial map with sample data if the user hasn't searched yet
                 with st.spinner("Loading initial sample data..."):
                     sample_stations_df = get_charging_stations(latitude, longitude, radius, filters)
-                    display_network_map(sample_stations_df, latitude, longitude, radius)
+                    # Get user email from session state if available
+                    email_address = st.session_state.get('email_address', None)
+                    display_network_map(sample_stations_df, latitude, longitude, radius, show_history, email_address)
                 st.info("Adjust your search criteria and click 'Search Stations' to update the map.")
     
     # Stations list
     if 'charging_map_data' in st.session_state:
         display_station_list(st.session_state.charging_map_data)
 
-def display_network_map(stations_df, center_lat, center_lon, radius):
+def display_network_map(stations_df, center_lat, center_lon, radius, show_history=True, email_address=None):
     """
     Display the charging station network map.
     
@@ -163,6 +173,8 @@ def display_network_map(stations_df, center_lat, center_lon, radius):
         center_lat (float): Center latitude
         center_lon (float): Center longitude
         radius (int): Search radius in kilometers
+        show_history (bool): Whether to show the user's historical charging locations
+        email_address (str): Optional email address to load user-specific data
     """
     if stations_df.empty:
         st.warning("No charging stations found matching your criteria.")
@@ -232,6 +244,74 @@ def display_network_map(stations_df, center_lat, center_lon, radius):
             tooltip=f"{station['name']} - {station['connector_type']} - {status}",
             icon=folium.Icon(color=color, icon='plug', prefix='fa')
         ).add_to(marker_cluster)
+    
+    # Add user's historical charging locations if requested
+    if show_history:
+        # Get email address from session state if not provided
+        if email_address is None and 'email_address' in st.session_state:
+            email_address = st.session_state['email_address']
+        
+        if email_address:
+            # Load user's charging data
+            charging_data = data_storage.load_charging_data(email_address)
+            
+            if charging_data:
+                # Convert to DataFrame
+                user_df = data_storage.convert_to_dataframe(charging_data)
+                
+                # Get location coordinates
+                user_df_with_coords = location_mapper.get_location_coordinates(user_df)
+                
+                # Create a separate layer for user's charging history
+                history_group = folium.FeatureGroup(name="Your Charging History")
+                
+                # Add markers for user's historical charging locations
+                history_count = 0
+                
+                for idx, record in user_df_with_coords.iterrows():
+                    # Skip records without coordinates
+                    if pd.isna(record.get('latitude')) or pd.isna(record.get('longitude')):
+                        continue
+                    
+                    # Check if location is within search radius (rough calculation)
+                    lat_diff = abs(record['latitude'] - center_lat)
+                    lon_diff = abs(record['longitude'] - center_lon)
+                    # Simple Euclidean distance in degrees, rough approximation
+                    dist_approx = ((lat_diff**2 + lon_diff**2) ** 0.5) * 111  # km
+                    
+                    if dist_approx <= radius * 1.2:  # 20% buffer to ensure we include all relevant points
+                        history_count += 1
+                        
+                        # Create popup content with charging details
+                        date_str = record['date'].strftime('%d %b %Y') if 'date' in record and not pd.isna(record['date']) else 'Unknown date'
+                        energy = f"{record.get('energy_kwh', 0):.2f} kWh" if 'energy_kwh' in record and not pd.isna(record['energy_kwh']) else 'Unknown'
+                        cost = f"${record.get('cost', 0):.2f}" if 'cost' in record and not pd.isna(record['cost']) else 'Unknown'
+                        provider = record.get('provider', record.get('location', 'Unknown Provider'))
+                        
+                        popup_content = f"""
+                        <div style="font-family: Arial, sans-serif; padding: 5px; min-width: 200px;">
+                            <h4 style="margin: 0 0 5px 0;">{provider}</h4>
+                            <p><b>Date:</b> {date_str}</p>
+                            <p><b>Location:</b> {record.get('location', 'Unknown location')}</p>
+                            <p><b>Energy:</b> {energy}</p>
+                            <p><b>Cost:</b> {cost}</p>
+                        </div>
+                        """
+                        
+                        # Add marker
+                        folium.Marker(
+                            location=[record['latitude'], record['longitude']],
+                            popup=folium.Popup(popup_content, max_width=300),
+                            tooltip=f"Your charging: {provider} - {date_str}",
+                            icon=folium.Icon(color='purple', icon='bolt', prefix='fa')
+                        ).add_to(history_group)
+                
+                # Add the history layer to the map
+                history_group.add_to(m)
+                
+                # Display count of history points
+                if history_count > 0:
+                    st.info(f"Showing {history_count} of your historical charging locations within this area.")
     
     # Display the map
     folium_static(m)
