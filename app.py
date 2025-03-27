@@ -971,9 +971,8 @@ with st.sidebar:
                             # Add a source marker to identify EVCC data
                             for item in evcc_data:
                                 item['source'] = 'EVCC CSV'
-                                # Ensure each EVCC record has a proper ID
-                                if 'id' not in item:
-                                    item['id'] = generate_record_id(item)
+                                # Always generate a fresh ID for EVCC data to avoid issues
+                                item['id'] = generate_record_id(item)
                             
                             # If replace_evcc_data is checked, mark the data for replacement
                             if 'replace_evcc_data' in locals() and replace_evcc_data:

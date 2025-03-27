@@ -100,22 +100,36 @@ def generate_record_id(record):
     
     # Different handling based on source to ensure uniqueness
     if record.get('source') == 'EVCC CSV':
-        # For EVCC data, use precise timestamp fields
-        if record.get('time'):
-            id_fields.append(str(record['time']))
+        # For EVCC data, we need more specific identifiers to prevent duplicates
         
+        # Created time (start time) is crucial for EVCC records
+        if record.get('time'):
+            id_fields.append(f"time:{str(record['time'])}")
+        
+        # Finished time (end time) is also important
         if record.get('end_date'):
-            id_fields.append(str(record['end_date']))
+            id_fields.append(f"end_date:{str(record['end_date'])}")
+        
+        # Duration is a key unique identifier for EVCC sessions
+        if record.get('duration'):
+            id_fields.append(f"duration:{str(record['duration'])}")
             
-        # Include exact energy values for EVCC for better uniqueness
-        for field in ['total_kwh', 'peak_kw', 'duration', 'cost_per_kwh', 'total_cost']:
+        # Energy value is essential for uniqueness
+        if record.get('total_kwh'):
+            id_fields.append(f"total_kwh:{record['total_kwh']}")
+            
+        # Other numeric values help ensure uniqueness
+        for field in ['peak_kw', 'cost_per_kwh', 'total_cost']:
             if record.get(field):
                 id_fields.append(f"{field}:{record[field]}")
                 
-        # Include generic fields with prefixes to prevent field value collisions 
-        for field in ['provider', 'location', 'vehicle']:
-            if record.get(field):
-                id_fields.append(f"{field}:{record[field]}")
+        # Vehicle identifier is important for EVCC
+        if record.get('vehicle'):
+            id_fields.append(f"vehicle:{record['vehicle']}")
+            
+        # Location is also relevant
+        if record.get('location'):
+            id_fields.append(f"location:{record['location']}")
                 
     elif record.get('source') == 'PDF Upload':
         # For PDF data

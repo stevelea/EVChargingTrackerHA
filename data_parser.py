@@ -382,6 +382,7 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
                 'source': 'EVCC CSV',  # Mark the source for identification in replace operations
                 'total_kwh': None,
                 'peak_kw': None,
+                'id': None,  # Ensure we have an ID field
                 'duration': None,
                 'cost_per_kwh': default_cost_per_kwh,  # Use default cost
                 'total_cost': None,
