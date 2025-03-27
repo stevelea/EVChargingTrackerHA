@@ -692,11 +692,27 @@ def create_visualizations(data):
                                   (data['kwh_per_km'] < 1)]  # Filter out extreme outliers
             
             if len(efficiency_data) > 0:
+                # Sort data and ensure we have Python native types
+                efficiency_data_sorted = efficiency_data.sort_values('date').copy()
+                
+                # Extract values for size parameter to avoid Series objects
+                size_values = []
+                for val in efficiency_data_sorted[energy_col]:
+                    try:
+                        num_val = float(val) if val is not None and pd.notna(val) else 5.0
+                        size_values.append(5.0 if num_val == 0 else num_val)
+                    except (ValueError, TypeError):
+                        size_values.append(5.0)
+                        
+                # Make sure we have the right number of values
+                if len(size_values) != len(efficiency_data_sorted):
+                    size_values = [5.0] * len(efficiency_data_sorted)
+                    
                 figures['energy_efficiency'] = px.scatter(
-                    efficiency_data.sort_values('date'),
+                    efficiency_data_sorted,
                     x='date',
                     y='kwh_per_km',
-                    size=energy_col,
+                    size=size_values,  # Use converted list of values
                     color='provider',
                     hover_name='location',
                     hover_data={
@@ -741,11 +757,27 @@ def create_visualizations(data):
                                    (data['cost_per_km'] < 1)]  # Filter outliers
             
             if len(cost_per_km_data) > 0:
+                # Sort data and ensure we have Python native types
+                cost_per_km_data_sorted = cost_per_km_data.sort_values('date').copy()
+                
+                # Extract values for size parameter to avoid Series objects
+                cost_size_values = []
+                for val in cost_per_km_data_sorted[cost_col]:
+                    try:
+                        num_val = float(val) if val is not None and pd.notna(val) else 5.0
+                        cost_size_values.append(5.0 if num_val == 0 else num_val)
+                    except (ValueError, TypeError):
+                        cost_size_values.append(5.0)
+                        
+                # Make sure we have the right number of values
+                if len(cost_size_values) != len(cost_per_km_data_sorted):
+                    cost_size_values = [5.0] * len(cost_per_km_data_sorted)
+                
                 figures['cost_per_km'] = px.scatter(
-                    cost_per_km_data.sort_values('date'),
+                    cost_per_km_data_sorted,
                     x='date',
                     y='cost_per_km',
-                    size=cost_col,
+                    size=cost_size_values,  # Use converted list of values
                     color='provider',
                     hover_name='location',
                     hover_data={

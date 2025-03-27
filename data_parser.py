@@ -156,6 +156,7 @@ def parse_charging_emails(emails):
             
             # Check if this is an Ampol AmpCharge receipt
             is_ampol = 'ampol' in email_subject.lower() or 'ampcharge' in email_subject.lower()
+            is_evie = 'evie' in email_subject.lower() or 'evie' in email_body.lower()
             
             # Detect and set the provider based on email subject and body
             if is_ampol:
@@ -173,9 +174,27 @@ def parse_charging_emails(emails):
                             data['location'] = loc
                             break
                     
-            elif 'evie' in email_subject.lower() or 'evie' in email_body.lower():
+            elif is_evie:
                 data['provider'] = 'Evie Networks'
-                # For Evie Networks, try to extract more location details if empty
+                
+                # For Evie Networks, check for the specific location format in their receipts first
+                if not data['location']:
+                    # Try to extract location from Evie Networks receipt format
+                    # Pattern for location name followed by address on next line(s)
+                    evie_pattern = r'(?:Warners Bay Grove|[A-Za-z\s]+(?:Hub|Station|Grove|Centre))\s*\n+\s*([^\n]+?(?:Rd|Road|St|Street|Ave|Avenue|Dr|Drive|Hwy|Highway)[^\n]*(?:,|\n)[^\n]*)'
+                    
+                    match = re.search(evie_pattern, email_body, re.IGNORECASE)
+                    if match:
+                        data['location'] = match.group(1).strip()
+                    
+                    # If still no location, look for any address line followed by suburb and postcode
+                    if not data['location']:
+                        address_pattern = r'(\d+\s+[A-Za-z\s]+(?:Rd|Road|St|Street|Ave|Avenue|Dr|Drive|Hwy|Highway)\s+[A-Za-z\s]+,\s*[A-Z]{2,3}\s+\d{4})'
+                        match = re.search(address_pattern, email_body, re.IGNORECASE)
+                        if match:
+                            data['location'] = match.group(1).strip()
+                
+                # Fall back to generic locations if specific pattern fails
                 if not data['location']:
                     evie_locations = [
                         "Evie Networks Brisbane", "Evie Networks Sydney", "Evie Networks Melbourne",
@@ -413,13 +432,13 @@ def parse_charging_emails(emails):
     
     return charging_data
 
-def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
+def parse_evcc_csv(csv_file, default_cost_per_kwh=0.01):
     """
     Parse charging data from EVCC CSV export file.
     
     Args:
         csv_file: File object containing EVCC CSV data
-        default_cost_per_kwh: Default cost per kWh to use for EVCC sessions (default: 0.21)
+        default_cost_per_kwh: Default cost per kWh to use for EVCC sessions (default: 0.01)
         
     Returns:
         List of dictionaries containing extracted charging data
