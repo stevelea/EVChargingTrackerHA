@@ -145,14 +145,68 @@ def parse_charging_emails(emails):
             # Detect and set the provider based on email subject and body
             if is_ampol:
                 data['provider'] = 'AmpCharge'
+                # For AmpCharge, try to extract more location details if empty
+                if not data['location']:
+                    ampol_locations = [
+                        "AmpCharge Alexandria", "AmpCharge Belconnen", "AmpCharge Melbourne CBD",
+                        "AmpCharge Brisbane", "AmpCharge Sydney Airport", "AmpCharge Perth",
+                        "AmpCharge Adelaide", "AmpCharge Canberra"
+                    ]
+                    # Check if any of these locations appear in the email
+                    for loc in ampol_locations:
+                        if loc.lower() in email_body.lower() or loc.lower() in email_subject.lower():
+                            data['location'] = loc
+                            break
+                    
             elif 'evie' in email_subject.lower() or 'evie' in email_body.lower():
                 data['provider'] = 'Evie Networks'
+                # For Evie Networks, try to extract more location details if empty
+                if not data['location']:
+                    evie_locations = [
+                        "Evie Networks Brisbane", "Evie Networks Sydney", "Evie Networks Melbourne",
+                        "Evie Networks Perth", "Evie Networks Adelaide", "Evie Networks Canberra",
+                        "Evie Networks Hobart", "Evie Networks Darwin"
+                    ]
+                    # Check if any of these locations appear in the email
+                    for loc in evie_locations:
+                        if loc.lower() in email_body.lower() or loc.lower() in email_subject.lower():
+                            data['location'] = loc
+                            break
+                    
             elif 'chargefox' in email_subject.lower() or 'chargefox' in email_body.lower():
                 data['provider'] = 'Chargefox'
+                # For Chargefox, try to extract more location details if empty
+                if not data['location']:
+                    chargefox_locations = [
+                        "Chargefox Sydney CBD", "Chargefox Melbourne CBD", "Chargefox Brisbane CBD",
+                        "Chargefox Perth CBD", "Chargefox Adelaide CBD", "Chargefox Canberra CBD",
+                        "Chargefox Hobart", "Chargefox Darwin"
+                    ]
+                    # Check if any of these locations appear in the email
+                    for loc in chargefox_locations:
+                        if loc.lower() in email_body.lower() or loc.lower() in email_subject.lower():
+                            data['location'] = loc
+                            break
+                    
             elif 'chargepoint' in email_subject.lower() or 'chargepoint' in email_body.lower():
                 data['provider'] = 'ChargePoint'
             elif 'tesla' in email_subject.lower() or 'tesla' in email_body.lower():
                 data['provider'] = 'Tesla'
+                # For Tesla, try to extract more location details if empty
+                if not data['location']:
+                    tesla_locations = [
+                        "Tesla Supercharger Sydney", "Tesla Supercharger Melbourne", 
+                        "Tesla Supercharger Brisbane", "Tesla Supercharger Perth",
+                        "Tesla Supercharger Adelaide", "Tesla Supercharger Canberra",
+                        "Tesla Supercharger Hobart", "Tesla Supercharger Darwin",
+                        "Tesla Supercharger Gold Coast", "Tesla Supercharger Newcastle"
+                    ]
+                    # Check if any of these locations appear in the email
+                    for loc in tesla_locations:
+                        if loc.lower() in email_body.lower() or loc.lower() in email_subject.lower():
+                            data['location'] = loc
+                            break
+                    
             elif 'electrify' in email_subject.lower() or 'electrify' in email_body.lower():
                 data['provider'] = 'Electrify America'
             elif 'jolt' in email_subject.lower() or 'jolt' in email_body.lower():
@@ -298,6 +352,22 @@ def parse_charging_emails(emails):
                     except ValueError:
                         data[field] = None
             
+            # If we still don't have a location but have a provider, create a generic location
+            if not data['location'] and data['provider'] != 'Unknown':
+                # Create a generic location based on provider name
+                locations_by_city = ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Canberra"]
+                # If we find a city name in the email, use it
+                found_city = False
+                for city in locations_by_city:
+                    if city.lower() in email_body.lower() or city.lower() in email_subject.lower():
+                        data['location'] = f"{data['provider']} {city}"
+                        found_city = True
+                        break
+                
+                # If no city found, default to a generic location
+                if not found_city:
+                    data['location'] = f"{data['provider']} Charging Station"
+            
             # Skip entries that don't have the minimum required data
             if (data['date'] is not None and 
                 (data['total_kwh'] is not None or data['total_cost'] is not None)):
@@ -383,7 +453,7 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.21):
             data = {
                 'date': None,
                 'time': None,
-                'location': 'EVCC Charger',  # Default location
+                'location': 'EVCC Sydney Charging Station',  # Better default location name
                 'provider': 'EVCC',  # Set provider to EVCC
                 'source': 'EVCC CSV',  # Mark the source for identification in replace operations
                 'total_kwh': None,

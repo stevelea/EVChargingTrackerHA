@@ -118,12 +118,18 @@ def parse_charging_pdf(pdf_file):
             r'Charging Time:\s*(\d{1,2}:\d{2} [APM]{2})',
             r'(\d{1,2}:\d{2} [APM]{2})'
         ],
-        # Match location patterns
+        # Match location patterns - expanded to capture more formats
         'location': [
             r'Location:\s*(.+?)(?:\n|\r|$)',
             r'Station:\s*(.+?)(?:\n|\r|$)',
             r'Charger Location:\s*(.+?)(?:\n|\r|$)',
-            r'Address:\s*(.+?)(?:\n|\r|$)'
+            r'Address:\s*(.+?)(?:\n|\r|$)',
+            r'Charging Station:\s*(.+?)(?:\n|\r|$)',
+            r'Station Address:\s*(.+?)(?:\n|\r|$)',
+            r'at\s+(.+?)\s+charging station',
+            r'Thank you for charging at\s+(.+?)[\.\n\r]',
+            r'You charged at\s+(.+?)[,\.\n\r]',
+            r'Station Name:\s*(.+?)(?:\n|\r|$)'
         ],
         # Match total kWh delivered
         'total_kwh': [
@@ -277,6 +283,22 @@ def parse_charging_pdf(pdf_file):
     if data['total_cost'] is not None and data['total_kwh'] is not None and data['cost_per_kwh'] is None:
         if data['total_kwh'] > 0:
             data['cost_per_kwh'] = data['total_cost'] / data['total_kwh']
+    
+    # If we still don't have a location but have a provider, create a generic location
+    if not data['location'] and data['provider'] != 'Unknown':
+        # Create a generic location based on provider name
+        locations_by_city = ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Canberra"]
+        # If we find a city name in the text, use it
+        found_city = False
+        for city in locations_by_city:
+            if city.lower() in text.lower() or city.lower() in pdf_file.name.lower():
+                data['location'] = f"{data['provider']} {city}"
+                found_city = True
+                break
+        
+        # If no city found, default to a generic location
+        if not found_city:
+            data['location'] = f"{data['provider']} Charging Station"
     
     # Skip entries that don't have the minimum required data
     if data['date'] is not None and (data['total_kwh'] is not None or data['total_cost'] is not None):
