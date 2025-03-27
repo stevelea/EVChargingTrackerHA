@@ -142,6 +142,29 @@ def export_data_as_csv(data):
     csv_buffer.seek(0)
     return csv_buffer.getvalue()
 
+def get_plugshare_link(location, latitude=None, longitude=None):
+    """
+    Generate a PlugShare URL for a specific location
+    
+    Args:
+        location: Name of the location
+        latitude: Latitude coordinate (optional)
+        longitude: Longitude coordinate (optional)
+        
+    Returns:
+        URL to the PlugShare search for this location
+    """
+    import urllib.parse
+    
+    # If we have coordinates, use them for a more precise search
+    if latitude is not None and longitude is not None:
+        # PlugShare uses the format: https://www.plugshare.com/map#/location/latitude,longitude
+        return f"https://www.plugshare.com/map#/location/{latitude},{longitude}"
+    else:
+        # Otherwise, use the location name for a general search
+        encoded_location = urllib.parse.quote(location)
+        return f"https://www.plugshare.com/map#/location?address={encoded_location}"
+
 def calculate_statistics(data):
     """
     Calculate summary statistics from charging data

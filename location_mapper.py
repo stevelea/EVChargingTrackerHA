@@ -10,6 +10,8 @@ from streamlit_folium import folium_static
 import pandas as pd
 import streamlit as st
 
+from utils import get_plugshare_link
+
 # Initialize geocoder with the app name
 geocoder = Nominatim(user_agent="ev_charging_analyzer")
 
@@ -123,6 +125,9 @@ def create_charging_map(df, zoom_start=10):
     
     # Add markers for each location
     for _, row in map_data.iterrows():
+        # Generate PlugShare link for this location
+        plugshare_url = get_plugshare_link(row['location'], row['latitude'], row['longitude'])
+        
         # Create popup content
         popup_content = f"""
         <b>Location:</b> {row['location']}<br>
@@ -130,6 +135,8 @@ def create_charging_map(df, zoom_start=10):
         <b>Provider:</b> {row['provider']}<br>
         <b>Energy:</b> {row['total_kwh']:.2f} kWh<br>
         <b>Cost:</b> ${row['total_cost']:.2f}<br>
+        <br>
+        <a href="{plugshare_url}" target="_blank">View on PlugShare</a>
         """
         
         # Create marker
@@ -227,10 +234,12 @@ def display_charging_map(df):
         location_stats = df_with_coords.groupby('location').agg({
             'total_kwh': 'sum',
             'total_cost': 'sum',
-            'date': 'count'
+            'date': 'count',
+            'latitude': 'first',
+            'longitude': 'first'
         }).reset_index()
         
-        location_stats.columns = ['Location', 'Total Energy (kWh)', 'Total Cost ($)', 'Number of Sessions']
+        location_stats.columns = ['Location', 'Total Energy (kWh)', 'Total Cost ($)', 'Number of Sessions', 'Latitude', 'Longitude']
         location_stats['Average Cost per kWh ($)'] = location_stats['Total Cost ($)'] / location_stats['Total Energy (kWh)']
         
         # Format columns
@@ -238,6 +247,15 @@ def display_charging_map(df):
         location_stats['Total Cost ($)'] = location_stats['Total Cost ($)'].round(2)
         location_stats['Average Cost per kWh ($)'] = location_stats['Average Cost per kWh ($)'].round(2)
         
-        st.dataframe(location_stats, use_container_width=True)
+        # Add PlugShare links
+        location_stats['PlugShare Link'] = location_stats.apply(
+            lambda row: f"[View on PlugShare]({get_plugshare_link(row['Location'], row['Latitude'], row['Longitude'])})", 
+            axis=1
+        )
+        
+        # Drop coordinate columns before display
+        display_stats = location_stats.drop(columns=['Latitude', 'Longitude'])
+        
+        st.dataframe(display_stats, use_container_width=True)
     else:
         st.info("Add specific location names like 'Sydney CBD' or 'Brisbane Airport' to view them on the map.")
