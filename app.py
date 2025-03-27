@@ -22,6 +22,7 @@ from location_mapper import display_charging_map
 from predictive_analysis import (
     forecast_monthly_cost, predict_cost_by_provider, usage_prediction
 )
+from network_map import display_charging_network_map
 
 # Set page configuration
 st.set_page_config(
@@ -101,6 +102,7 @@ if 'dashboard_preferences' not in st.session_state:
             'energy_efficiency': {'visible': True, 'order': 14, 'name': 'Energy Efficiency (kWh per km)'},
             'cost_per_km': {'visible': True, 'order': 15, 'name': 'Cost Efficiency ($ per km)'},
             'map_view': {'visible': True, 'order': 16, 'name': 'Location Map'},
+            'network_map': {'visible': True, 'order': 17, 'name': 'Charging Network Map'},
         },
         'layout': 'tabs',  # 'tabs' or 'grid'
         'grid_columns': 2   # Number of columns if using grid layout
@@ -1501,13 +1503,14 @@ if st.session_state.authenticated:
                 'provider_analysis': {'name': 'Provider Comparison', 'charts': ['provider_cost_comparison', 'provider_kwh_comparison']},
                 'predictive_analysis': {'name': 'Future Predictions', 'charts': ['monthly_cost_forecast', 'provider_trend_prediction', 'usage_prediction']},
                 'map_view': {'name': 'Location Map', 'charts': []},
+                'network_map': {'name': 'Charging Network', 'charts': []},
                 'raw_data': {'name': 'Raw Data', 'charts': []}
             }
             
             # Filter for at least one visible chart in each tab group
             visible_tabs = []
             for group_id, group in tab_groups.items():
-                if group_id == 'raw_data' or group_id == 'map_view' or any(chart_id in charts and 
+                if group_id == 'raw_data' or group_id == 'map_view' or group_id == 'network_map' or any(chart_id in charts and 
                                               st.session_state.dashboard_preferences['panels'].get(chart_id, {}).get('visible', False) 
                                               for chart_id in group['charts']):
                     visible_tabs.append(group)
@@ -1639,6 +1642,10 @@ if st.session_state.authenticated:
                         # Display the map and location statistics
                         display_charging_map(data)
                         
+                    elif group['name'] == 'Charging Network':
+                        # Display the interactive charging network map
+                        display_charging_network_map()
+                        
                     elif group['name'] == 'Raw Data':
                         st.subheader("Raw Data")
                         
@@ -1726,6 +1733,12 @@ if st.session_state.authenticated:
             
             # Display the interactive map
             display_charging_map(data)
+            
+            # Add Charging Network Map section
+            st.subheader("Charging Network Map")
+            
+            # Display the interactive charging network map
+            display_charging_network_map()
             
             # Add Raw Data section at the end
             st.subheader("Raw Data")
