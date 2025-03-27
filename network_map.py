@@ -106,28 +106,49 @@ def display_charging_network_map():
             if search_button or 'charging_map_data' in st.session_state:
                 with st.spinner("Fetching charging station data..."):
                     # Check for OpenChargeMap API key
-                    api_key = st.secrets["OCMAP_API_KEY"] if "OCMAP_API_KEY" in st.secrets else None
+                    api_key = None
+                    if "OCMAP_API_KEY" in st.secrets:
+                        api_key = st.secrets["OCMAP_API_KEY"]
+                    elif "ocmap_api_key" in st.session_state:
+                        api_key = st.session_state.ocmap_api_key
+                    
+                    # If no API key, show option to enter one
                     if not api_key:
-                        st.warning("No OpenChargeMap API key found. Using limited data mode.")
+                        st.warning("No OpenChargeMap API key found. Using sample data mode.")
                         
                         # Ask for API key
-                        provided_key = st.text_input("Enter OpenChargeMap API key (optional)", 
-                                                    help="Get a free API key from https://openchargemap.org/site/develop")
+                        provided_key = st.text_input(
+                            "Enter OpenChargeMap API key (optional)", 
+                            help="Get a free API key from https://openchargemap.org/site/develop",
+                            key="api_key_input"
+                        )
+                        
                         if provided_key:
-                            # Store the key in environment variable for current session
+                            # Store the key in environment variable and session state
                             import os
                             os.environ["OCMAP_API_KEY"] = provided_key
+                            st.session_state.ocmap_api_key = provided_key
+                            api_key = provided_key
+                            st.success("API key saved for this session!")
                     
-                    # Fetch charging station data
-                    stations_df = get_charging_stations(latitude, longitude, radius, filters)
+                    if search_button or not 'charging_map_data' in st.session_state:
+                        # Fetch charging station data
+                        stations_df = get_charging_stations(latitude, longitude, radius, filters)
+                        
+                        # Save in session state for persistence between interactions
+                        st.session_state.charging_map_data = stations_df
+                    else:
+                        # Use cached data
+                        stations_df = st.session_state.charging_map_data
                     
-                    # Save in session state for persistence between interactions
-                    st.session_state.charging_map_data = stations_df
-                    
-                    # Display network map
+                    # Always display the map, even if it's using generated sample data
                     display_network_map(stations_df, latitude, longitude, radius)
             else:
-                st.info("Set your search criteria and click 'Search Stations' to display charging stations.")
+                # Show an initial map with sample data if the user hasn't searched yet
+                with st.spinner("Loading initial sample data..."):
+                    sample_stations_df = get_charging_stations(latitude, longitude, radius, filters)
+                    display_network_map(sample_stations_df, latitude, longitude, radius)
+                st.info("Adjust your search criteria and click 'Search Stations' to update the map.")
     
     # Stations list
     if 'charging_map_data' in st.session_state:

@@ -224,7 +224,7 @@ def generate_sample_stations(center_lat, center_lon, radius):
     
     # Generate sample locations around the center point
     stations = []
-    for i in range(10):
+    for i in range(20):  # Increased number of sample stations
         # Generate random coordinates within the radius
         # This is a simplified approach that doesn't account for Earth's curvature
         lat_offset = (random.random() * 2 - 1) * radius / 111.0
@@ -245,10 +245,10 @@ def generate_sample_stations(center_lat, center_lon, radius):
             },
             "AddressInfo": {
                 "Title": f"{operator} Charging Station #{i+1}",
-                "AddressLine1": f"{random.randint(1, 100)} Sample Street",
-                "Town": "Sample City",
-                "StateOrProvince": "Sample State",
-                "Postcode": f"{random.randint(1000, 9999)}",
+                "AddressLine1": f"{random.randint(1, 100)} {random.choice(['Main', 'Park', 'Elizabeth', 'George', 'Collins', 'King', 'William', 'Pitt', 'Queen', 'Market'])} {random.choice(['Street', 'Road', 'Avenue', 'Boulevard', 'Lane', 'Drive'])}",
+                "Town": random.choice(['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Canberra', 'Darwin', 'Hobart', 'Newcastle', 'Wollongong', 'Gold Coast']),
+                "StateOrProvince": random.choice(['NSW', 'VIC', 'QLD', 'WA', 'SA', 'ACT', 'NT', 'TAS']),
+                "Postcode": f"{random.randint(2000, 6999)}",
                 "CountryID": 13,  # Australia
                 "Country": {
                     "Title": "Australia"
@@ -274,7 +274,18 @@ def generate_sample_stations(center_lat, center_lon, radius):
             "UsageType": {
                 "Title": random.choice(["Public", "Private", "Restricted Access"])
             },
-            "GeneralComments": "Sample charging station for demonstration purposes."
+            "GeneralComments": random.choice([
+                "Located in shopping center parking, access during mall hours only.", 
+                "24/7 access, well-lit area with security cameras.", 
+                "Located near café with free WiFi while charging.",
+                "Fast charging available, 15-30 minute typical charge time.",
+                "Part of highway charging corridor, typically busy on weekends.",
+                "Located in hotel parking, guests have priority but public access available.",
+                f"Recently installed {random.choice(['2023', '2024'])} station, reliable operation.",
+                "Popular station, may require waiting during peak hours.",
+                "Located in underground parking garage, height restriction 2.1m.",
+                "Chargers located at rear of parking area, follow signs."
+            ])
         }
         
         # Add a second connector to some stations
