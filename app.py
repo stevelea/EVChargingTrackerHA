@@ -429,7 +429,7 @@ with st.sidebar:
                                     st.info("No duplicate records found.")
                 
                 # Data Management Tabs
-                data_mgmt_tabs = st.tabs(["Selective Delete", "Odometer Updates", "Delete All"])
+                data_mgmt_tabs = st.tabs(["Selective Delete", "Manual Entry", "Odometer Updates", "Delete All"])
                 
                 # Selective Delete Tab
                 with data_mgmt_tabs[0]:
@@ -590,8 +590,177 @@ with st.sidebar:
                     else:
                         st.warning("No records found matching your criteria.")
                 
-                # Odometer Updates Tab
+                # Manual Entry Tab
                 with data_mgmt_tabs[1]:
+                    st.subheader("Manually Add Charging Session")
+                    st.write("Enter details for a new charging session:")
+                    
+                    with st.form("manual_entry_form"):
+                        # Form fields for charging session data
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            # Date and time
+                            charge_date = st.date_input(
+                                "Charging Date:", 
+                                value=datetime.now(),
+                                key="manual_charge_date"
+                            )
+                            
+                            # Provider
+                            providers = sorted(set(record.get('provider', 'Unknown') 
+                                              for record in stored_data 
+                                              if record.get('provider', 'Unknown') != 'Unknown')
+                                          or ['Tesla', 'ChargeFox', 'Evie', 'AmpCharge'])
+                            
+                            provider = st.selectbox(
+                                "Provider:", 
+                                options=providers,
+                                key="manual_provider"
+                            )
+                            
+                            # Location
+                            location = st.text_input(
+                                "Location:", 
+                                value="",
+                                key="manual_location",
+                                placeholder="e.g., Westfield Bondi Junction"
+                            )
+                            
+                            # Duration in minutes
+                            duration_minutes = st.number_input(
+                                "Duration (minutes):", 
+                                min_value=1, 
+                                max_value=1440,
+                                value=30,
+                                step=1,
+                                key="manual_duration"
+                            )
+                        
+                        with col2:
+                            # Energy details
+                            total_kwh = st.number_input(
+                                "Total Energy (kWh):", 
+                                min_value=0.1, 
+                                max_value=200.0,
+                                value=30.0,
+                                step=0.1,
+                                format="%.1f",
+                                key="manual_kwh"
+                            )
+                            
+                            peak_kw = st.number_input(
+                                "Peak Power (kW):", 
+                                min_value=1.0, 
+                                max_value=350.0,
+                                value=50.0,
+                                step=1.0,
+                                format="%.1f",
+                                key="manual_peak_kw"
+                            )
+                            
+                            # Cost details
+                            cost_per_kwh = st.number_input(
+                                "Cost per kWh ($):", 
+                                min_value=0.0, 
+                                max_value=2.0,
+                                value=0.52,
+                                step=0.01,
+                                format="%.2f",
+                                key="manual_cost_per_kwh"
+                            )
+                            
+                            total_cost = st.number_input(
+                                "Total Cost ($):", 
+                                min_value=0.0, 
+                                max_value=500.0,
+                                value=round(total_kwh * cost_per_kwh, 2),
+                                step=0.01,
+                                format="%.2f",
+                                key="manual_total_cost"
+                            )
+                            
+                            # Odometer reading
+                            odometer = st.number_input(
+                                "Odometer Reading (km):", 
+                                min_value=0.0, 
+                                max_value=1000000.0,
+                                value=0.0,
+                                step=1.0,
+                                format="%.1f",
+                                key="manual_odometer"
+                            )
+                        
+                        # Submit button
+                        submit_button = st.form_submit_button("Add Charging Session")
+                    
+                    # Process form submission outside the form
+                    if submit_button:
+                        # Create charging record
+                        new_record = {
+                            'date': datetime.combine(charge_date, datetime.min.time()),
+                            'provider': provider,
+                            'location': location,
+                            'total_kwh': float(total_kwh),
+                            'peak_kw': float(peak_kw),
+                            'cost_per_kwh': float(cost_per_kwh),
+                            'total_cost': float(total_cost),
+                            'duration': duration_minutes * 60,  # Convert minutes to seconds
+                            'source': 'Manual Entry',
+                            'odometer': float(odometer) if odometer > 0 else None
+                        }
+                        
+                        # Generate a unique ID
+                        new_record['id'] = generate_record_id(new_record)
+                        
+                        # Load existing data
+                        existing_data = load_charging_data(st.session_state.current_user_email)
+                        
+                        # Add new record
+                        if existing_data:
+                            # Check for duplicates
+                            duplicate = False
+                            for record in existing_data:
+                                if record.get('id') == new_record['id']:
+                                    duplicate = True
+                                    break
+                            
+                            if not duplicate:
+                                existing_data.append(new_record)
+                                save_charging_data(existing_data, st.session_state.current_user_email)
+                                st.success("Charging session added successfully!")
+                                
+                                # Update main data
+                                st.session_state.charging_data = clean_charging_data(existing_data)
+                                st.rerun()
+                            else:
+                                st.error("A duplicate record already exists.")
+                        else:
+                            # First record
+                            save_charging_data([new_record], st.session_state.current_user_email)
+                            st.success("Charging session added successfully!")
+                            
+                            # Update main data
+                            st.session_state.charging_data = clean_charging_data([new_record])
+                            st.rerun()
+                            
+                    # Tips for manual entry
+                    with st.expander("Tips for Manual Entry"):
+                        st.markdown("""
+                        ### Tips for accurate manual entries:
+                        
+                        - Enter the date when the charging session occurred
+                        - Provider refers to the charging network (e.g., Tesla, ChargeFox, Evie)
+                        - Location should be descriptive (e.g., "Westfield Bondi Junction")
+                        - Total Energy is the amount of electricity delivered in kilowatt-hours (kWh)
+                        - Peak Power is the maximum charging rate achieved in kilowatts (kW)
+                        - You can enter either Cost per kWh or Total Cost, and the system will calculate the other
+                        - Duration is how long the charging session lasted
+                        - Odometer reading is optional but helpful for efficiency calculations
+                        """)
+                
+                # Odometer Updates Tab
+                with data_mgmt_tabs[2]:
                     st.subheader("Update Odometer Readings")
                     st.write("Manually update the odometer reading for each charging session.")
                     
@@ -749,7 +918,7 @@ with st.sidebar:
                         """)
                 
                 # Delete All Tab
-                with data_mgmt_tabs[2]:
+                with data_mgmt_tabs[3]:
                     st.subheader("Delete All Data")
                     st.warning("This will permanently delete all your stored charging data. This action cannot be undone.")
                     
