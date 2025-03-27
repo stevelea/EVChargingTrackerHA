@@ -1,0 +1,108 @@
+# EV Charging Tracker
+
+A comprehensive web application that helps you track, analyze, and visualize your electric vehicle charging data.
+
+## Features
+
+- Manual input of charging sessions
+- Import data from various sources:
+  - Gmail charging receipts via IMAP
+  - PDF charging receipts
+  - EVCC CSV files
+  - Tesla API
+- Interactive visualizations:
+  - Charging costs over time
+  - Energy usage trends
+  - Provider comparisons
+  - Efficiency metrics (kWh/km, $/km)
+- Charging location mapping
+- Predictive analysis for future costs
+- Multi-user support with data separated by account
+
+## Docker Deployment
+
+### Prerequisites
+
+1. Docker and Docker Compose installed on your system
+2. Basic knowledge of running containers
+
+### Getting Started
+
+1. **Download the application code**
+
+   There are two ways to get the application code:
+
+   **Option 1: Use the download script (Recommended)**
+   
+   Download the `download_for_deployment.sh` script and run it:
+
+   ```bash
+   chmod +x download_for_deployment.sh
+   ./download_for_deployment.sh
+   ```
+
+   This will create a new directory called `ev-charging-tracker` with all necessary files for deployment.
+
+   **Option 2: Manual download**
+   
+   Download all files from this project to a directory on your computer.
+
+2. **Build and start the container**
+
+   Open a terminal in the directory containing the downloaded files and run:
+
+   ```bash
+   docker-compose up -d
+   ```
+
+   This will build the Docker image and start the container in detached mode.
+
+3. **Access the application**
+
+   Open your web browser and navigate to:
+
+   ```
+   http://localhost:5000
+   ```
+
+   If you're accessing from another device on your network, replace `localhost` with the IP address of the computer running Docker.
+
+### Data Persistence
+
+The application stores all data in the `./data` directory, which is mounted as a volume in the Docker container. This ensures your charging data persists even if the container is restarted or rebuilt.
+
+### Updating the Application
+
+To update the application to a newer version:
+
+1. Download the updated code
+2. Run the following commands:
+
+   ```bash
+   docker-compose down
+   docker-compose up -d --build
+   ```
+
+## Security Notes
+
+- The application uses IMAP for Gmail access, which requires an App Password.
+- Never share your Gmail App Password with others.
+- When running on your home network, the application is accessible to all devices on the network unless firewall rules are in place.
+
+## Troubleshooting
+
+- If the application is not accessible, check that Docker is running properly:
+  ```bash
+  docker ps
+  ```
+  You should see the `ev-charging-tracker` container running.
+
+- If data is not persisting, check that the volume mount is working correctly:
+  ```bash
+  docker volume ls
+  ```
+
+- To view logs:
+  ```bash
+  docker logs ev-charging-tracker
+  ```

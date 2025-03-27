@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  ev-charging-tracker:
+    build: .
+    container_name: ev-charging-tracker
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount the data directory to persist charging data
+      - ./data:/app/data
+    restart: unless-stopped
