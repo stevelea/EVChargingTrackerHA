@@ -125,29 +125,42 @@ def create_visualizations(data):
     peak_kw_values = None
     if 'peak_kw' in data.columns:
         try:
-            # Create a list directly with proper Python types (not pandas Series objects)
-            # Convert to a standard Python list to avoid any Series-related issues
-            peak_kw_values = [5.0] * len(data)  # Default value
+            # Start with default values
+            peak_kw_values = [5.0] * len(data)
             
-            # Converting to numeric values first
-            numeric_peak_kw = pd.to_numeric(data['peak_kw'], errors='coerce').fillna(5.0)
-            
-            # Then convert to a standard Python list to avoid any Series-related issues
-            plain_list = numeric_peak_kw.tolist()
-            
-            # Replace any zeros with default value and ensure all values are Python floats
-            for i, val in enumerate(plain_list):
-                if val == 0 or pd.isna(val):
-                    plain_list[i] = 5.0
-                else:
-                    plain_list[i] = float(val)
-            
-            peak_kw_values = plain_list
-            
+            # Explicitly extract values from the dataframe as Python floats
+            if hasattr(data['peak_kw'], 'values'):
+                # For pandas Series or DataFrame
+                raw_values = data['peak_kw'].values
+                
+                # Convert any numpy array to a standard Python list
+                if hasattr(raw_values, 'tolist'):
+                    raw_values = raw_values.tolist()
+                
+                # If we got a list with the correct length, process it
+                if isinstance(raw_values, list) and len(raw_values) == len(data):
+                    for i, val in enumerate(raw_values):
+                        try:
+                            # Convert to float and handle None, NaN or 0
+                            if val is None or pd.isna(val) or float(val) <= 0:
+                                peak_kw_values[i] = 5.0
+                            else:
+                                peak_kw_values[i] = float(val)
+                        except (ValueError, TypeError):
+                            # Keep default value for any conversion errors
+                            peak_kw_values[i] = 5.0
+            else:
+                # Fallback for any other type of object
+                print("peak_kw column doesn't have expected .values attribute")
+                
             # Double-check that we have the correct number of values
             if len(peak_kw_values) != len(data):
                 print(f"Peak kW values length mismatch: {len(peak_kw_values)} vs {len(data)}")
                 peak_kw_values = [5.0] * len(data)
+            
+            # Final verification that all values are normal Python floats
+            peak_kw_values = [float(val) if val is not None and not pd.isna(val) else 5.0 for val in peak_kw_values]
+                
         except Exception as e:
             print(f"Error converting peak_kw: {str(e)}")
             # If conversion fails, create a list of fixed values

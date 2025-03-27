@@ -505,7 +505,7 @@ def parse_evcc_csv(csv_file, default_cost_per_kwh=0.01):
             data = {
                 'date': None,
                 'time': None,
-                'location': 'EVCC Sydney Charging Station',  # Better default location name
+                'location': 'Home Charging Station',  # Generic home location name to avoid conflicts
                 'provider': 'EVCC',  # Set provider to EVCC
                 'source': 'EVCC CSV',  # Mark the source for identification in replace operations
                 'total_kwh': None,
