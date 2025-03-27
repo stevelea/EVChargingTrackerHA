@@ -226,7 +226,7 @@ def display_charging_map(df):
         
         # If showing samples is checked, add sample charging locations for demonstration
         if show_samples:
-            # Create sample location data
+            # Create sample location data with pre-defined coordinates
             sample_locations = [
                 {"location": "Sydney CBD Tesla Supercharger", "date": pd.Timestamp.now(), 
                  "provider": "Tesla", "total_kwh": 45.5, "total_cost": 22.75,
@@ -245,11 +245,22 @@ def display_charging_map(df):
                  "latitude": -31.9505, "longitude": 115.8605}
             ]
             
-            # Add sample locations to the dataframe
+            # Create sample DataFrame
             sample_df = pd.DataFrame(sample_locations)
+            
+            # Update geocoding cache with sample locations to ensure they appear
+            if 'geocoding_cache' not in st.session_state:
+                st.session_state.geocoding_cache = {}
+                
+            # Add samples to cache
+            for _, row in sample_df.iterrows():
+                location_key = row['location'].lower()
+                st.session_state.geocoding_cache[location_key] = (row['latitude'], row['longitude'])
+            
+            # Add sample locations to the main dataframe
             df_for_map = pd.concat([df_for_map, sample_df], ignore_index=True)
         
-        # Get coordinates for all locations
+        # Process coordinates for the complete dataset
         df_with_coords = get_location_coordinates(df_for_map)
     
     # Create the map
@@ -287,7 +298,7 @@ def display_charging_map(df):
         # Drop coordinate columns before display
         display_stats = location_stats.drop(columns=['Latitude', 'Longitude'])
         
-        # Tell Streamlit to render the HTML in the PlugShare Link column
-        st.dataframe(display_stats, use_container_width=True, unsafe_allow_html=True)
+        # Display the stats dataframe
+        st.dataframe(display_stats, use_container_width=True)
     else:
         st.info("Add specific location names like 'Sydney CBD' or 'Brisbane Airport' to view them on the map.")
