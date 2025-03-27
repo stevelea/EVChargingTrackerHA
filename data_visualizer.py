@@ -31,9 +31,13 @@ def calculate_distances(data):
     # Replace negative values with NaN (happens if odometer readings aren't in sequence)
     df.loc[df['distance'] < 0, 'distance'] = np.nan
     
+    # Check which column names are being used (for backwards compatibility)
+    cost_col = 'cost' if 'cost' in df.columns else 'total_cost'
+    energy_col = 'energy_kwh' if 'energy_kwh' in df.columns else 'total_kwh'
+    
     # Calculate cost per km where possible
-    df['cost_per_km'] = df['total_cost'] / df['distance']
-    df['kwh_per_km'] = df['total_kwh'] / df['distance']
+    df['cost_per_km'] = df[cost_col] / df['distance']
+    df['kwh_per_km'] = df[energy_col] / df['distance']
     
     # Replace infinite values with NaN
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
