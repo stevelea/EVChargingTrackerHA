@@ -126,17 +126,23 @@ def create_visualizations(data):
     if 'peak_kw' in data.columns:
         try:
             # Create a list directly with proper Python types (not pandas Series objects)
-            peak_kw_values = []
+            # Convert to a standard Python list to avoid any Series-related issues
+            peak_kw_values = [5.0] * len(data)  # Default value
             
-            # Process each value individually to ensure proper conversion
-            for val in data['peak_kw']:
-                try:
-                    num_val = float(val) if val is not None and pd.notna(val) else 5.0
-                    # Use default if value is 0
-                    peak_kw_values.append(5.0 if num_val == 0 else num_val)
-                except (ValueError, TypeError):
-                    # Handle conversion errors
-                    peak_kw_values.append(5.0)
+            # Converting to numeric values first
+            numeric_peak_kw = pd.to_numeric(data['peak_kw'], errors='coerce').fillna(5.0)
+            
+            # Then convert to a standard Python list to avoid any Series-related issues
+            plain_list = numeric_peak_kw.tolist()
+            
+            # Replace any zeros with default value and ensure all values are Python floats
+            for i, val in enumerate(plain_list):
+                if val == 0 or pd.isna(val):
+                    plain_list[i] = 5.0
+                else:
+                    plain_list[i] = float(val)
+            
+            peak_kw_values = plain_list
             
             # Double-check that we have the correct number of values
             if len(peak_kw_values) != len(data):

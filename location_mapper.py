@@ -318,8 +318,8 @@ def display_charging_map(df):
         
         st.session_state.geocoding_cache[home_location.lower()] = (home_lat, home_lon)
         
-    # Add sample charging locations checkbox 
-    show_samples = st.checkbox("Show sample charging locations", value=True,
+    # Add sample charging locations checkbox - default to False to avoid confusion
+    show_samples = st.checkbox("Show sample charging locations", value=False,
                       help="Display sample charging locations on the map for demonstration")
     
     # Create and process the data for mapping
