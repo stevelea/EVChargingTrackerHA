@@ -279,6 +279,19 @@ with st.sidebar:
             st.info(f"{status_icon} Replit persistence {status_text}")
         else:
             st.info("🔄 Using local file storage")
+            
+        # Quick delete all data option
+        with st.expander("Delete All Data", expanded=False):
+            st.warning("⚠️ This will permanently delete ALL your stored charging data!")
+            confirm = st.checkbox("I understand this will delete all my data", key="sidebar_confirm_delete")
+            if confirm:
+                if st.button("DELETE ALL DATA", type="primary", use_container_width=True, key="sidebar_delete_all"):
+                    if delete_charging_data(st.session_state.current_user_email):
+                        st.success("All stored charging data has been cleared.")
+                        st.session_state.charging_data = None
+                        st.rerun()
+                    else:
+                        st.error("Failed to clear charging data.")
         
         # Show currently stored data info
         stored_data = load_charging_data(st.session_state.current_user_email)
@@ -977,16 +990,19 @@ with st.sidebar:
                     st.subheader("Delete All Data")
                     st.warning("This will permanently delete all your stored charging data. This action cannot be undone.")
                     
-                    # Option to clear all data
-                    if st.button("Clear All Stored Data", type="secondary"):
-                        confirm = st.checkbox("I understand this will delete all my data", key="confirm_delete_all")
-                        if confirm and st.button("Confirm Delete All Data", type="primary"):
+                    # Simplified delete process with a checkbox first followed by a single button
+                    confirm = st.checkbox("I understand this will delete all my data permanently", key="confirm_delete_all")
+                    
+                    if confirm:
+                        if st.button("DELETE ALL DATA", type="primary", use_container_width=True):
                             if delete_charging_data(st.session_state.current_user_email):
                                 st.success("All stored charging data has been cleared.")
                                 st.session_state.charging_data = None
                                 st.rerun()
                             else:
                                 st.error("Failed to clear charging data.")
+                    else:
+                        st.info("Please confirm you understand the consequences by checking the box above.")
             else:
                 st.info("No charging data is currently stored in the database.")
             
