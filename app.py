@@ -1507,7 +1507,7 @@ if st.session_state.authenticated:
             # Filter for at least one visible chart in each tab group
             visible_tabs = []
             for group_id, group in tab_groups.items():
-                if group_id == 'raw_data' or any(chart_id in charts and 
+                if group_id == 'raw_data' or group_id == 'map_view' or any(chart_id in charts and 
                                               st.session_state.dashboard_preferences['panels'].get(chart_id, {}).get('visible', False) 
                                               for chart_id in group['charts']):
                     visible_tabs.append(group)

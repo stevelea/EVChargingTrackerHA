@@ -213,12 +213,41 @@ def display_charging_map(df):
             st.session_state.geocoding_cache = {}
         
         st.session_state.geocoding_cache[home_location.lower()] = (home_lat, home_lon)
+        
+    # Add sample charging locations checkbox 
+    show_samples = st.checkbox("Show sample charging locations", value=True,
+                      help="Display sample charging locations on the map for demonstration")
     
     # Create and process the data for mapping
     with st.spinner("Processing location data..."):
         # Replace "Garage" with the home location name in the dataset
         df_for_map = df.copy()
         df_for_map.loc[df_for_map['location'] == "Garage", 'location'] = st.session_state.home_location
+        
+        # If showing samples is checked, add sample charging locations for demonstration
+        if show_samples:
+            # Create sample location data
+            sample_locations = [
+                {"location": "Sydney CBD Tesla Supercharger", "date": pd.Timestamp.now(), 
+                 "provider": "Tesla", "total_kwh": 45.5, "total_cost": 22.75,
+                 "latitude": -33.8688, "longitude": 151.2093},
+                {"location": "Melbourne Central Charging Station", "date": pd.Timestamp.now(),
+                 "provider": "Ampol AmpCharge", "total_kwh": 35.2, "total_cost": 18.60,
+                 "latitude": -37.8136, "longitude": 144.9631},
+                {"location": "Brisbane Airport EV Station", "date": pd.Timestamp.now(),
+                 "provider": "Evie Networks", "total_kwh": 28.7, "total_cost": 15.32,
+                 "latitude": -27.3942, "longitude": 153.1218},
+                {"location": "Adelaide CBD Chargers", "date": pd.Timestamp.now(),
+                 "provider": "ChargeFox", "total_kwh": 32.1, "total_cost": 16.05,
+                 "latitude": -34.9285, "longitude": 138.6007},
+                {"location": "Perth Shopping Centre", "date": pd.Timestamp.now(),
+                 "provider": "NRMA", "total_kwh": 40.3, "total_cost": 20.15,
+                 "latitude": -31.9505, "longitude": 115.8605}
+            ]
+            
+            # Add sample locations to the dataframe
+            sample_df = pd.DataFrame(sample_locations)
+            df_for_map = pd.concat([df_for_map, sample_df], ignore_index=True)
         
         # Get coordinates for all locations
         df_with_coords = get_location_coordinates(df_for_map)
