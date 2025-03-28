@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to EV Charging Tracker",
+        "description": "Set up EV Charging Tracker integration",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "api_key": "API Key (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the EV Charging Tracker API"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  }
+}

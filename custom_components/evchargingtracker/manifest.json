@@ -1,0 +1,14 @@
+{
+  "domain": "evchargingtracker",
+  "name": "EV Charging Tracker",
+  "config_flow": true,
+  "documentation": "https://github.com/user/evchargingtracker",
+  "requirements": [],
+  "ssdp": [],
+  "zeroconf": [],
+  "homekit": {},
+  "dependencies": [],
+  "codeowners": ["@user"],
+  "iot_class": "local_polling",
+  "version": "1.0.0"
+}

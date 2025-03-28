@@ -1,0 +1,1 @@
+"""Custom components directory for Home Assistant integration."""

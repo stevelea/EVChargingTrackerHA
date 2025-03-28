@@ -1,0 +1,84 @@
+# Example Home Assistant configuration.yaml entries for EV Charging Tracker integration
+
+# ------------------------------------------------
+# METHOD 1: UI Configuration (Recommended)
+# ------------------------------------------------
+# The integration can be configured through the Home Assistant UI:
+# 1. Navigate to Configuration > Integrations
+# 2. Click the "+ ADD INTEGRATION" button
+# 3. Search for "EV Charging Tracker" and select it
+# 4. Enter your host, port, and optional API key
+# 5. Click "Submit"
+
+# ------------------------------------------------
+# METHOD 2: Manual YAML Configuration (Alternative)
+# ------------------------------------------------
+# Alternatively, you can add this to your configuration.yaml:
+
+evchargingtracker:
+  host: localhost  # Hostname or IP address of your EV Charging Tracker server
+  port: 5001       # Port of the API server (default: 5001)
+  api_key: ""      # Optional API key if your API requires authentication
+
+# ------------------------------------------------
+# Example Automations using EV Charging Tracker data
+# ------------------------------------------------
+
+automation:
+  # Notification when a new charging session is detected
+  - alias: "EV Charging Notification"
+    trigger:
+      platform: state
+      entity_id: sensor.last_charging_date
+    condition:
+      - condition: template
+        value_template: "{{ trigger.from_state.state != trigger.to_state.state }}"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "EV Charging Completed"
+          message: >
+            New charging session detected at {{ states('sensor.last_charging_location') }}
+            Energy: {{ states('sensor.last_charging_energy') }} kWh
+            Cost: ${{ states('sensor.last_charging_cost') }}
+
+  # Send alert when average cost exceeds a threshold
+  - alias: "High EV Charging Cost Alert"
+    trigger:
+      platform: numeric_state
+      entity_id: sensor.average_cost_per_kwh
+      above: 0.40  # Alert if average cost exceeds $0.40/kWh
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "High EV Charging Cost Alert"
+          message: >
+            Your average charging cost ({{ states('sensor.average_cost_per_kwh') }} $/kWh) 
+            has exceeded your threshold of $0.40/kWh.
+
+# ------------------------------------------------
+# Example Dashboard Cards
+# ------------------------------------------------
+
+# You can add these cards to your Lovelace UI:
+
+# Card 1: EV Charging Summary
+# type: entities
+# title: EV Charging Summary
+# entities:
+#   - entity: sensor.total_energy
+#   - entity: sensor.total_cost
+#   - entity: sensor.average_cost_per_kwh
+#   - entity: sensor.charging_session_count
+
+# Card 2: Latest Charging Session
+# type: entities
+# title: Latest Charging Session
+# entities:
+#   - entity: sensor.last_charging_energy
+#   - entity: sensor.last_charging_cost
+#   - entity: sensor.last_charging_location
+#   - entity: sensor.last_charging_date
+#   - entity: sensor.last_peak_power
+#   - entity: sensor.last_cost_per_kwh
+#   - entity: sensor.last_provider

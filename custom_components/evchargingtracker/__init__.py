@@ -1,0 +1,155 @@
+"""EV Charging Tracker integration for Home Assistant."""
+import asyncio
+import logging
+from datetime import timedelta
+from typing import Any, Dict, Optional
+
+import voluptuous as vol
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    CONF_API_KEY,
+    CONF_HOST,
+    CONF_PORT,
+    Platform,
+)
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .api import EVChargingTrackerApiClient
+
+_LOGGER = logging.getLogger(__name__)
+
+# Supported platforms
+PLATFORMS = [Platform.SENSOR]
+
+# Configuration schema
+CONFIG_SCHEMA = vol.Schema(
+    {
+        "evchargingtracker": vol.Schema(
+            {
+                vol.Required(CONF_HOST): cv.string,
+                vol.Required(CONF_PORT, default=5001): cv.port,
+                vol.Optional(CONF_API_KEY): cv.string,
+            }
+        )
+    },
+    extra=vol.ALLOW_EXTRA,
+)
+
+# Update interval (60 seconds)
+UPDATE_INTERVAL = timedelta(seconds=60)
+
+
+async def async_setup(hass: HomeAssistant, config: Dict) -> bool:
+    """Set up the EV Charging Tracker component."""
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up EV Charging Tracker from a config entry."""
+    host = entry.data[CONF_HOST]
+    port = entry.data[CONF_PORT]
+    api_key = entry.data.get(CONF_API_KEY)
+
+    session = async_get_clientsession(hass)
+    api_client = EVChargingTrackerApiClient(
+        session, f"http://{host}:{port}", api_key
+    )
+
+    # Verify connection to API
+    try:
+        health_check = await api_client.async_health_check()
+        if not health_check.get("status") == "ok":
+            _LOGGER.error("Failed to connect to EV Charging Tracker API")
+            return False
+    except Exception as exc:  # pylint: disable=broad-except
+        _LOGGER.error("Error connecting to EV Charging Tracker API: %s", exc)
+        return False
+
+    # Create update coordinator
+    coordinator = EVChargingTrackerDataUpdateCoordinator(hass, api_client)
+    
+    # Fetch initial data
+    await coordinator.async_config_entry_first_refresh()
+
+    # Store the coordinator
+    hass.data.setdefault("evchargingtracker", {})[entry.entry_id] = coordinator
+
+    # Set up platforms
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    # Unload platforms
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    # Remove coordinator
+    if unload_ok:
+        hass.data["evchargingtracker"].pop(entry.entry_id)
+
+    return unload_ok
+
+
+class EVChargingTrackerDataUpdateCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching EV Charging Tracker data."""
+
+    def __init__(self, hass: HomeAssistant, api_client: EVChargingTrackerApiClient):
+        """Initialize the coordinator."""
+        self.api_client = api_client
+        self.api_data = {"summary": {}, "latest_record": {}}
+
+        super().__init__(
+            hass,
+            _LOGGER,
+            name="EV Charging Tracker",
+            update_interval=UPDATE_INTERVAL,
+        )
+
+    async def _async_update_data(self) -> Dict[str, Any]:
+        """Fetch data from EV Charging Tracker API."""
+        try:
+            # Get summary
+            summary_result = await self.api_client.async_get_charging_summary()
+            if not summary_result:
+                raise UpdateFailed("Failed to fetch summary data")
+            
+            # Get charging data for latest record
+            charging_data_result = await self.api_client.async_get_charging_data()
+            if not charging_data_result:
+                raise UpdateFailed("Failed to fetch charging data")
+            
+            # Extract records from response - handle different response formats
+            records = charging_data_result.get("data", []) if isinstance(charging_data_result, dict) else []
+            
+            # Find latest record
+            latest_record = {}
+            if isinstance(records, list) and records:
+                try:
+                    # Sort by date if available to get latest record
+                    sorted_data = sorted(
+                        records,
+                        key=lambda x: x.get("date", ""),
+                        reverse=True
+                    )
+                    latest_record = sorted_data[0]
+                except (KeyError, IndexError, TypeError):
+                    if records:
+                        latest_record = records[0]
+            
+            # Update and return data
+            self.api_data = {
+                "summary": summary_result,
+                "latest_record": latest_record
+            }
+            
+            return self.api_data
+
+        except Exception as err:
+            _LOGGER.error("Error updating EV Charging Tracker data: %s", err)
+            raise UpdateFailed(f"Error updating data: {err}") from err
