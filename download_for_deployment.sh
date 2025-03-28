@@ -15,10 +15,17 @@ cd "$DEPLOY_DIR"
 # Create required directories
 mkdir -p data
 mkdir -p .streamlit
+mkdir -p examples
 
 # Copy all Python files
 echo "Copying Python files..."
 find "$SCRIPT_DIR" -maxdepth 1 -name "*.py" | grep -v "__pycache__" | xargs -I{} cp {} ./
+
+# Copy example files
+echo "Copying example files..."
+if [ -d "$SCRIPT_DIR/examples" ]; then
+  find "$SCRIPT_DIR/examples" -name "*.py" | xargs -I{} cp {} ./examples/
+fi
 
 # Copy Docker and configuration files
 echo "Copying Docker and configuration files..."
@@ -26,6 +33,8 @@ cp "$SCRIPT_DIR/Dockerfile" ./
 cp "$SCRIPT_DIR/docker-compose.yml" ./
 cp "$SCRIPT_DIR/docker-requirements.txt" ./
 cp "$SCRIPT_DIR/README.md" ./
+cp "$SCRIPT_DIR/start.sh" ./
+cp "$SCRIPT_DIR/API_DOCUMENTATION.md" ./
 cp "$SCRIPT_DIR/.streamlit/config.toml" ./.streamlit/
 
 # Create a simple README with instructions
@@ -49,6 +58,12 @@ application in Docker.
    ```
    http://localhost:5000
    ```
+
+4. The API service will be available at:
+   ```
+   http://localhost:5001
+   ```
+   See API_DOCUMENTATION.md for available endpoints and usage examples.
 
 ## Your Charging Data
 

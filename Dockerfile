@@ -23,8 +23,12 @@ RUN mkdir -p ./data
 COPY *.py .
 COPY .streamlit ./.streamlit
 
-# Expose the port Streamlit runs on
-EXPOSE 5000
+# Expose the ports for both Streamlit and API server
+EXPOSE 5000 5001
 
-# Command to run the app
-CMD ["streamlit", "run", "app.py", "--server.port=5000", "--server.address=0.0.0.0", "--logger.level=debug"]
+# Copy the startup script
+COPY start.sh .
+RUN chmod +x start.sh
+
+# Command to run both services
+CMD ["./start.sh"]

@@ -168,8 +168,19 @@ def create_visualizations(data):
     
     # Create scatter plot with or without variable size
     if peak_kw_values:
+        # Ensure all data is in compatible format for plotly
+        plot_dict = {
+            'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date']),
+            energy_col: plot_data[energy_col].tolist() if hasattr(plot_data[energy_col], 'tolist') else list(plot_data[energy_col]),
+            'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
+            'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
+            'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
+                        (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
+            cost_col: plot_data[cost_col].tolist() if hasattr(plot_data[cost_col], 'tolist') else list(plot_data[cost_col])
+        }
+        
         figures['time_series'] = px.scatter(
-            plot_data,  # Use pre-converted data
+            plot_dict,  # Use dictionary instead of DataFrame to avoid Series conversion issues
             x='date',
             y=energy_col,  # Use the correct column name
             size=peak_kw_values,  # Pass as explicit list of numeric values
@@ -192,8 +203,19 @@ def create_visualizations(data):
         )
     else:
         # Create scatter plot without variable size
+        # Convert to dictionary to avoid Series issues
+        plot_dict = {
+            'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date']),
+            energy_col: plot_data[energy_col].tolist() if hasattr(plot_data[energy_col], 'tolist') else list(plot_data[energy_col]),
+            'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
+            'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
+            'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
+                       (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
+            cost_col: plot_data[cost_col].tolist() if hasattr(plot_data[cost_col], 'tolist') else list(plot_data[cost_col])
+        }
+        
         figures['time_series'] = px.scatter(
-            plot_data,  # Use pre-converted data
+            plot_dict,  # Use dictionary instead of DataFrame
             x='date',
             y=energy_col,  # Use the correct column name
             color='cost_per_kwh',
@@ -413,8 +435,19 @@ def create_visualizations(data):
         print(f"Energy values length mismatch: {len(total_kwh_values)} vs {len(data)}")
         total_kwh_values = [5.0] * len(data)
     
+    # Create a clean dictionary for plotly to avoid Series issues
+    cost_plot_dict = {
+        'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date']),
+        'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
+        'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
+                   (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
+        'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
+        'total_cost': plot_data['total_cost'].tolist() if 'total_cost' in plot_data and hasattr(plot_data['total_cost'], 'tolist') else 
+                     (list(plot_data['total_cost']) if 'total_cost' in plot_data else [0] * len(plot_data))
+    }
+    
     figures['cost_per_kwh'] = px.scatter(
-        plot_data,  # Use pre-converted data
+        cost_plot_dict,  # Use dictionary instead of DataFrame
         x='date',
         y='cost_per_kwh',
         color='provider',  # Changed from location to provider
@@ -460,8 +493,19 @@ def create_visualizations(data):
     # Create a fallback version if peak_kw is missing or problematic
     if 'peak_kw' in data.columns and data['peak_kw'].notna().any():
         try:
+            # Create a clean dictionary for plotly to avoid Series issues
+            duration_plot_dict = {
+                'total_kwh': plot_data['total_kwh'].tolist() if hasattr(plot_data['total_kwh'], 'tolist') else list(plot_data['total_kwh']),
+                'peak_kw': plot_data['peak_kw'].tolist() if hasattr(plot_data['peak_kw'], 'tolist') else list(plot_data['peak_kw']),
+                'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
+                'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
+                'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
+                          (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
+                'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date'])
+            }
+            
             figures['charging_duration'] = px.scatter(
-                plot_data,  # Use pre-converted data
+                duration_plot_dict,  # Use dictionary instead of DataFrame
                 x='total_kwh',
                 y='peak_kw',
                 size=total_cost_values,  # Pass as explicit list
@@ -484,8 +528,19 @@ def create_visualizations(data):
         except Exception as e:
             print(f"Error creating charging_duration scatter plot: {str(e)}")
             # Fallback to a different visualization without peak_kw
+            # Create a clean dictionary for plotly to avoid Series issues
+            fallback_dict = {
+                'total_kwh': plot_data['total_kwh'].tolist() if hasattr(plot_data['total_kwh'], 'tolist') else list(plot_data['total_kwh']),
+                'total_cost': plot_data['total_cost'].tolist() if hasattr(plot_data['total_cost'], 'tolist') else list(plot_data['total_cost']),
+                'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
+                'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
+                'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
+                          (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
+                'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date'])
+            }
+            
             figures['charging_duration'] = px.scatter(
-                plot_data,
+                fallback_dict,  # Use dictionary instead of DataFrame
                 x='total_kwh',
                 y='total_cost',
                 size=total_cost_values,
@@ -506,8 +561,19 @@ def create_visualizations(data):
             )
     else:
         # If peak_kw is not available, create an alternative visualization
+        # Create a clean dictionary for plotly to avoid Series issues
+        alt_dict = {
+            'total_kwh': plot_data['total_kwh'].tolist() if hasattr(plot_data['total_kwh'], 'tolist') else list(plot_data['total_kwh']),
+            'total_cost': plot_data['total_cost'].tolist() if hasattr(plot_data['total_cost'], 'tolist') else list(plot_data['total_cost']),
+            'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
+            'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
+            'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
+                      (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
+            'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date'])
+        }
+        
         figures['charging_duration'] = px.scatter(
-            plot_data,
+            alt_dict,  # Use dictionary instead of DataFrame
             x='total_kwh',
             y='total_cost',
             size=total_cost_values,

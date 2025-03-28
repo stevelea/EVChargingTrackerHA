@@ -18,6 +18,8 @@ A comprehensive web application that helps you track, analyze, and visualize you
 - Charging location mapping
 - Predictive analysis for future costs
 - Multi-user support with data separated by account
+- REST API for external applications to access charging data
+- Interactive EV charging network map with real-time station availability
 
 ## Docker Deployment
 
@@ -88,6 +90,45 @@ To update the application to a newer version:
 - The application uses IMAP for Gmail access, which requires an App Password.
 - Never share your Gmail App Password with others.
 - When running on your home network, the application is accessible to all devices on the network unless firewall rules are in place.
+
+## API Access
+
+The application includes a REST API for accessing charging data from external applications. The API runs on port 5001 by default.
+
+### API Documentation
+
+For complete API documentation, see the [API_DOCUMENTATION.md](API_DOCUMENTATION.md) file.
+
+### Key Features
+
+- Retrieve charging data with filtering capabilities
+- Get charging summary statistics
+- Access individual charging records
+- Authentication via API key
+- Comprehensive Python client library included
+
+### Quick Example
+
+```python
+from api_client import EVChargingAPIClient
+
+# Create client
+client = EVChargingAPIClient(
+    base_url="http://localhost:5001",
+    api_key="ev-charging-api-key"
+)
+
+# Get charging data
+data = client.get_charging_data(email="user@example.com")
+print(f"Retrieved {data.get('count', 0)} charging records")
+
+# Get summary statistics
+summary = client.get_charging_summary()
+print(f"Total Energy: {summary.get('total_energy_kwh', 0)} kWh")
+print(f"Total Cost: ${summary.get('total_cost', 0)}")
+```
+
+Check the `examples` directory for more comprehensive usage examples.
 
 ## Troubleshooting
 

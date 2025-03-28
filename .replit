@@ -23,6 +23,10 @@ args = "streamlit_app"
 task = "workflow.run"
 args = "streamlit_browser"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "api_server"
+
 [[workflows.workflow]]
 name = "streamlit_app"
 author = "agent"
@@ -51,6 +55,21 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python -c \"import webbrowser; webbrowser.get('firefox').open('http://localhost:5000/')\""
+
+[[workflows.workflow]]
+name = "api_server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python api.py"
+waitForPort = 5001
 
 [[ports]]
 localPort = 5000
