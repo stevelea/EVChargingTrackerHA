@@ -165,15 +165,49 @@ if 'dashboard_preferences' not in st.session_state:
 st.title("⚡ EV Charging Data Analyzer")
 st.write("Extract and visualize your EV charging data from Gmail receipts")
 
+# Guest mode notice - add a banner for read-only access
+if st.session_state.guest_mode:
+    st.warning("👋 **Guest Mode**: You're viewing the application in read-only mode with sample data. No changes can be made to the data.") 
+
 # Sidebar for controls
 with st.sidebar:
     st.header("Controls")
     
     # Authentication section
-    st.subheader("Gmail Authentication")
+    st.subheader("Authentication")
     
-    if not st.session_state.authenticated:
-        st.info("Please authenticate with your Gmail account to access your charging receipts.")
+    if not st.session_state.authenticated and not st.session_state.guest_mode:
+        st.info("Please authenticate to access the application.")
+        
+        # Option to use the app in guest mode (read-only)
+        st.markdown("### Quick Access")
+        if st.button("🔍 Guest Mode (Read-only)"):
+            # Set up guest mode
+            st.session_state.guest_mode = True
+            st.session_state.current_user_email = "stevelea@gmail.com"
+            
+            # Create sample data for the guest user
+            try:
+                # Load data from stevelea@gmail.com account
+                existing_data = load_charging_data(st.session_state.current_user_email)
+                if existing_data:
+                    # Process the existing data
+                    df = clean_charging_data(existing_data)
+                    st.session_state.charging_data = df
+                else:
+                    # Fall back to sample data if no real data is available
+                    create_test_data.create_sample_charging_data()
+                    test_data = load_charging_data("test@example.com")
+                    st.session_state.charging_data = clean_charging_data(test_data)
+                
+                st.success("Guest mode activated. You can now view the data in read-only mode.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error loading guest data: {str(e)}")
+                st.session_state.guest_mode = False
+        
+        st.markdown("### Gmail Authentication")
+        st.info("Or authenticate with your Gmail account to access your own charging receipts.")
         
         # Load saved credentials if available
         if 'email_loaded' not in st.session_state:
@@ -252,16 +286,25 @@ with st.sidebar:
                 else:
                     st.error("Please enter both your Gmail address and the App Password")
     else:
-        st.success("Authenticated with Gmail")
-        if st.button("Logout"):
-            st.session_state.authenticated = False
-            st.session_state.auth_step = 1
-            st.session_state.gmail_client = GmailClient()  # Reset the client
-            st.session_state.charging_data = None
-            st.rerun()
+        # Handle both guest mode and authenticated users
+        if st.session_state.guest_mode:
+            st.success("Guest Mode (Read-only)")
+            if st.button("Exit Guest Mode"):
+                st.session_state.guest_mode = False
+                st.session_state.charging_data = None
+                st.session_state.current_user_email = None
+                st.rerun()
+        else:
+            st.success("Authenticated with Gmail")
+            if st.button("Logout"):
+                st.session_state.authenticated = False
+                st.session_state.auth_step = 1
+                st.session_state.gmail_client = GmailClient()  # Reset the client
+                st.session_state.charging_data = None
+                st.rerun()
     
-    # Tesla API Authentication section
-    if st.session_state.authenticated and not st.session_state.tesla_authenticated:
+    # Tesla API Authentication section (only show to authenticated users, not guest users)
+    if st.session_state.authenticated and not st.session_state.tesla_authenticated and not st.session_state.guest_mode:
         st.subheader("Tesla API Authentication (Optional)")
         st.info("Connect to Tesla API to retrieve charging data for non-Tesla vehicles using Tesla Superchargers.")
         
@@ -293,8 +336,8 @@ with st.sidebar:
             st.session_state.tesla_client = TeslaApiClient()  # Reset the client
             st.rerun()
     
-    # Background refresh management (only show if authenticated and background module is available)
-    if st.session_state.authenticated and BACKGROUND_AVAILABLE:
+    # Background refresh management (only show if authenticated, not for guest users)
+    if st.session_state.authenticated and not st.session_state.guest_mode and BACKGROUND_AVAILABLE:
         st.subheader("Background Refresh")
         
         # Check if saved password exists
@@ -389,8 +432,8 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Error performing manual refresh: {str(e)}")
     
-    # Database Cleaning section (only show if authenticated)
-    if st.session_state.authenticated:
+    # Database Cleaning section (only show if authenticated, not for guest users)
+    if st.session_state.authenticated and not st.session_state.guest_mode:
         st.subheader("Database Management")
         
         # Show Replit database status if available
