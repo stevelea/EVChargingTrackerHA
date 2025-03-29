@@ -11,6 +11,7 @@ def parse_charging_emails(emails):
     
     This function attempts to parse various formats of EV charging receipts 
     to extract key information like date, time, location, kWh, cost, etc.
+    Also processes EVCC CSV files attached to emails.
     
     Args:
         emails: List of email dictionaries containing subject, body, date, etc.
@@ -131,6 +132,32 @@ def parse_charging_emails(emails):
     
     for email in emails:
         try:
+            # Check for EVCC Charging Data emails with CSV attachments
+            email_subject = email.get('subject', '')
+            if "EVCC Charging Data" in email_subject and 'attachments' in email and email['attachments']:
+                for attachment in email['attachments']:
+                    if attachment['type'] == 'csv':
+                        try:
+                            # Create file-like object from attachment data
+                            import io
+                            csv_file = io.BytesIO(attachment['data'])
+                            
+                            # Parse EVCC CSV file
+                            evcc_data = parse_evcc_csv(csv_file)
+                            
+                            # Add all EVCC data to our result with source marker
+                            if evcc_data:
+                                for item in evcc_data:
+                                    item['source'] = 'EVCC CSV'
+                                charging_data.extend(evcc_data)
+                                st.success(f"Extracted {len(evcc_data)} charging sessions from EVCC CSV attachment")
+                        except Exception as e:
+                            st.error(f"Error processing EVCC CSV attachment: {str(e)}")
+                            import traceback
+                            st.error(traceback.format_exc())
+                # Continue to next email after processing EVCC CSV
+                continue
+                
             # Skip emails without bodies
             if not email.get('body'):
                 continue

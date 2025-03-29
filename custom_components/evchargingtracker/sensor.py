@@ -226,9 +226,37 @@ class EVChargingTrackerSensor(CoordinatorEntity, SensorEntity):
                 return
                 
             if self.entity_description.value_fn and self.entity_description.source_key:
-                self._attr_native_value = self.entity_description.value_fn(record)
+                value = self.entity_description.value_fn(record)
+                # Handle potential Series objects by converting to a Python primitive type
+                if hasattr(value, "__class__") and "Series" in value.__class__.__name__:
+                    try:
+                        # Convert Series to a list then take the first item if it exists
+                        value_list = list(value)
+                        if value_list:
+                            self._attr_native_value = value_list[0]
+                        else:
+                            self._attr_native_value = 0.0
+                    except Exception as e:
+                        _LOGGER.warning("Failed to convert Series to list: %s", e)
+                        self._attr_native_value = 0.0
+                else:
+                    self._attr_native_value = value
             elif self.entity_description.source_key:
-                self._attr_native_value = record.get(self.entity_description.source_key)
+                value = record.get(self.entity_description.source_key)
+                # Handle Series objects in the raw record data as well
+                if hasattr(value, "__class__") and "Series" in value.__class__.__name__:
+                    try:
+                        # Convert Series to a list then take the first item if it exists
+                        value_list = list(value)
+                        if value_list:
+                            self._attr_native_value = value_list[0]
+                        else:
+                            self._attr_native_value = None
+                    except Exception as e:
+                        _LOGGER.warning("Failed to convert Series to list: %s", e)
+                        self._attr_native_value = None
+                else:
+                    self._attr_native_value = value
                 
             # Make sure we don't have unsupported types
             if self._attr_native_value is not None:

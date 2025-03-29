@@ -39,8 +39,19 @@ class EVChargingTrackerApiClient:
         # Format the base URL correctly (remove trailing slash if present)
         base_url = self._base_url.rstrip('/')
         
+        # Special handling for Replit URLs (they may need a port specified)
+        if '.replit.app' in base_url:
+            # For Replit deployments, ensure it uses HTTPS and handle port properly
+            if not base_url.startswith('https://') and not base_url.startswith('http://'):
+                base_url = f"https://{base_url}"
+                
+            # Add port 8000 if not already included and if it's not using a standard HTTPS port
+            if ':8000' not in base_url and ':443' not in base_url:
+                base_url = f"{base_url}:8000"
+        
         # Combine to form the complete URL
         url = f"{base_url}{endpoint}"
+        _LOGGER.debug("Final API URL: %s", url)
         
         _LOGGER.debug("Making request to %s with headers: %s, params: %s", 
                     url, self._headers, params)

@@ -5,7 +5,7 @@ This custom integration allows you to integrate your EV Charging Tracker data in
 ## Prerequisites
 
 - Home Assistant instance (Core, OS, Container, or Supervised)
-- EV Charging Tracker application running with the API server enabled (running on port 5001)
+- EV Charging Tracker application running with the API server enabled (running on port 8000)
 - Network access from Home Assistant to the EV Charging Tracker application
 
 ## Installation
@@ -33,7 +33,7 @@ This custom integration allows you to integrate your EV Charging Tracker data in
 4. Search for "EV Charging Tracker" and select it.
 5. Enter the following information:
    - **Host**: The hostname or IP address of your EV Charging Tracker server (e.g., `localhost` or `192.168.1.10`)
-   - **Port**: The port of the API server (default is `5001`)
+   - **Port**: The port of the API server (default is `8000`)
    - **API Key**: (Optional) If your API requires an API key
 
 6. Click **Submit** to add the integration.

@@ -22,7 +22,22 @@ async def validate_api_connection(
     session = async_get_clientsession(hass)
     
     # Format the base URL correctly
-    base_url = f"http://{host}:{port}"
+    # Handle Replit URLs separately (with special port handling)
+    if '.replit.app' in host:
+        # For Replit deployments, ensure it uses HTTPS
+        if not host.startswith('http'):
+            if not host.startswith('https://'):
+                host = 'https://' + host
+        
+        # When using a Replit domain, use port 8000 by default if not specified
+        if ':8000' not in host and ':443' not in host:
+            base_url = f"{host}:8000"
+        else:
+            base_url = host
+    else:
+        # For standard host:port combinations
+        base_url = f"http://{host}:{port}"
+    
     _LOGGER.debug("Creating API client with base URL: %s", base_url)
     
     # Create the client
@@ -78,8 +93,15 @@ class EVChargingTrackerConfigFlow(config_entries.ConfigFlow, domain="evchargingt
 
                 if is_valid:
                     # Create entry
+                    # Create a better title that won't cause URL parsing issues
+                    if '.replit.app' in host:
+                        clean_host = host.replace('https://', '').replace('http://', '')
+                        title = f"EV Charging Tracker ({clean_host})"
+                    else:
+                        title = f"EV Charging Tracker ({host}:{port})"
+                    
                     return self.async_create_entry(
-                        title=f"EV Charging Tracker ({host}:{port})",
+                        title=title,
                         data=user_input,
                     )
                 

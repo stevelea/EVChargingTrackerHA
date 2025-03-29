@@ -1492,7 +1492,7 @@ if st.session_state.authenticated:
         days_back = 90
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
-        search_query = "EV charging receipt OR Ampol AmpCharge OR charging session"
+        search_query = "EV charging receipt OR Ampol AmpCharge OR charging session OR EVCC Charging Data"
         incremental_update = True
         
         # Execute data fetch

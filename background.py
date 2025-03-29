@@ -50,7 +50,7 @@ def refresh_data(email_address=None, password=None, search_terms=None):
         
         # Default search terms if none provided
         if not search_terms:
-            search_terms = "EV charging receipt OR Ampol AmpCharge OR charging session"
+            search_terms = "EV charging receipt OR Ampol AmpCharge OR charging session OR EVCC Charging Data"
         
         # Initialize Gmail client and authenticate
         client = GmailClient()

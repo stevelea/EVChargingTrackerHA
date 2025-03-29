@@ -4,6 +4,64 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
+def safe_convert_to_list(series_obj, default_value=None):
+    """
+    Safely convert any type of Series object to a standard Python list.
+    
+    Args:
+        series_obj: The Series-like object to convert
+        default_value: Default value to use for failed conversions
+        
+    Returns:
+        A standard Python list
+    """
+    # Handle None or already-list objects
+    if series_obj is None:
+        return [] if default_value is None else [default_value]
+    if isinstance(series_obj, list):
+        return series_obj
+        
+    # Try different conversion methods
+    try:
+        # Check object type to detect Series objects (including narwhals.stable.v1.Series)
+        if "Series" in str(type(series_obj)):
+            # For Series, manually iterate through values
+            result = []
+            for i in range(len(series_obj)):
+                try:
+                    if hasattr(series_obj, "iloc"):
+                        val = series_obj.iloc[i]
+                    elif hasattr(series_obj, "__getitem__"):
+                        val = series_obj[i]
+                    else:
+                        val = default_value
+                    result.append(val)
+                except:
+                    result.append(default_value)
+            return result
+        
+        # For pandas Series with to_list method
+        elif hasattr(series_obj, "to_list"):
+            return series_obj.to_list()
+            
+        # For numpy arrays or other objects with tolist method
+        elif hasattr(series_obj, "tolist"):
+            return series_obj.tolist()
+            
+        # For standard iterables that can be directly converted to list
+        elif hasattr(series_obj, "__iter__"):
+            return list(series_obj)
+            
+        # Otherwise, wrap in a list 
+        else:
+            return [series_obj]
+            
+    except Exception as e:
+        print(f"Error in safe_convert_to_list: {str(e)}")
+        if default_value is None:
+            return []
+        return [default_value]
+
 def calculate_distances(data):
     """
     Calculate distances traveled between charging sessions based on odometer readings
@@ -137,9 +195,9 @@ def create_visualizations(data):
                 
                 # Handle different types that might be in the peak_kw column
                 
-                # Special handling for narwhals.stable.v1.Series
-                if "narwhals.stable.v1.Series" in str(type(data['peak_kw'])):
-                    print("Detected a narwhals Series, using item-by-item conversion")
+                # Special handling for any Series objects (including narwhals.stable.v1.Series)
+                if "Series" in str(type(data['peak_kw'])):
+                    print(f"Detected a Series object: {type(data['peak_kw'])}, using item-by-item conversion")
                     
                     # For narwhals Series, we use a completely different approach that doesn't rely on built-in methods
                     # We'll use a for loop with index access and explicit type conversion
@@ -274,15 +332,14 @@ def create_visualizations(data):
     
     # Create scatter plot with or without variable size
     if peak_kw_values:
-        # Ensure all data is in compatible format for plotly
+        # Ensure all data is in compatible format for plotly using our safe converter
         plot_dict = {
-            'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date']),
-            energy_col: plot_data[energy_col].tolist() if hasattr(plot_data[energy_col], 'tolist') else list(plot_data[energy_col]),
-            'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
-            'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
-            'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
-                        (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
-            cost_col: plot_data[cost_col].tolist() if hasattr(plot_data[cost_col], 'tolist') else list(plot_data[cost_col])
+            'date': safe_convert_to_list(plot_data['date']),
+            energy_col: safe_convert_to_list(plot_data[energy_col], 0.0),
+            'cost_per_kwh': safe_convert_to_list(plot_data['cost_per_kwh'], 0.0),
+            'location': safe_convert_to_list(plot_data['location'], 'Unknown'),
+            'provider': safe_convert_to_list(plot_data['provider'] if 'provider' in plot_data else ['Unknown'] * len(plot_data), 'Unknown'),
+            cost_col: safe_convert_to_list(plot_data[cost_col], 0.0)
         }
         
         figures['time_series'] = px.scatter(
@@ -309,15 +366,14 @@ def create_visualizations(data):
         )
     else:
         # Create scatter plot without variable size
-        # Convert to dictionary to avoid Series issues
+        # Convert to dictionary using our safe conversion helper to avoid Series issues
         plot_dict = {
-            'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date']),
-            energy_col: plot_data[energy_col].tolist() if hasattr(plot_data[energy_col], 'tolist') else list(plot_data[energy_col]),
-            'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
-            'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
-            'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
-                       (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
-            cost_col: plot_data[cost_col].tolist() if hasattr(plot_data[cost_col], 'tolist') else list(plot_data[cost_col])
+            'date': safe_convert_to_list(plot_data['date']),
+            energy_col: safe_convert_to_list(plot_data[energy_col], 0.0),
+            'cost_per_kwh': safe_convert_to_list(plot_data['cost_per_kwh'], 0.0),
+            'location': safe_convert_to_list(plot_data['location'], 'Unknown'),
+            'provider': safe_convert_to_list(plot_data['provider'] if 'provider' in plot_data else ['Unknown'] * len(plot_data), 'Unknown'),
+            cost_col: safe_convert_to_list(plot_data[cost_col], 0.0)
         }
         
         figures['time_series'] = px.scatter(
@@ -541,15 +597,13 @@ def create_visualizations(data):
         print(f"Energy values length mismatch: {len(total_kwh_values)} vs {len(data)}")
         total_kwh_values = [5.0] * len(data)
     
-    # Create a clean dictionary for plotly to avoid Series issues
+    # Create a clean dictionary for plotly using our safe conversion helper
     cost_plot_dict = {
-        'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date']),
-        'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
-        'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
-                   (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
-        'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
-        'total_cost': plot_data['total_cost'].tolist() if 'total_cost' in plot_data and hasattr(plot_data['total_cost'], 'tolist') else 
-                     (list(plot_data['total_cost']) if 'total_cost' in plot_data else [0] * len(plot_data))
+        'date': safe_convert_to_list(plot_data['date']),
+        'cost_per_kwh': safe_convert_to_list(plot_data['cost_per_kwh'], 0.0),
+        'provider': safe_convert_to_list(plot_data['provider'] if 'provider' in plot_data else ['Unknown'] * len(plot_data), 'Unknown'),
+        'location': safe_convert_to_list(plot_data['location'], 'Unknown'),
+        'total_cost': safe_convert_to_list(plot_data['total_cost'] if 'total_cost' in plot_data else [0] * len(plot_data), 0.0)
     }
     
     figures['cost_per_kwh'] = px.scatter(
@@ -599,15 +653,14 @@ def create_visualizations(data):
     # Create a fallback version if peak_kw is missing or problematic
     if 'peak_kw' in data.columns and data['peak_kw'].notna().any():
         try:
-            # Create a clean dictionary for plotly to avoid Series issues
+            # Create a clean dictionary for plotly using our safe conversion helper
             duration_plot_dict = {
-                'total_kwh': plot_data['total_kwh'].tolist() if hasattr(plot_data['total_kwh'], 'tolist') else list(plot_data['total_kwh']),
-                'peak_kw': plot_data['peak_kw'].tolist() if hasattr(plot_data['peak_kw'], 'tolist') else list(plot_data['peak_kw']),
-                'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
-                'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
-                'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
-                          (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
-                'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date'])
+                'total_kwh': safe_convert_to_list(plot_data['total_kwh'], 0.0),
+                'peak_kw': safe_convert_to_list(plot_data['peak_kw'], 0.0),
+                'cost_per_kwh': safe_convert_to_list(plot_data['cost_per_kwh'], 0.0),
+                'location': safe_convert_to_list(plot_data['location'], 'Unknown'),
+                'provider': safe_convert_to_list(plot_data['provider'] if 'provider' in plot_data else ['Unknown'] * len(plot_data), 'Unknown'),
+                'date': safe_convert_to_list(plot_data['date'])
             }
             
             figures['charging_duration'] = px.scatter(
@@ -634,15 +687,14 @@ def create_visualizations(data):
         except Exception as e:
             print(f"Error creating charging_duration scatter plot: {str(e)}")
             # Fallback to a different visualization without peak_kw
-            # Create a clean dictionary for plotly to avoid Series issues
+            # Create a clean dictionary for plotly using our safe conversion helper
             fallback_dict = {
-                'total_kwh': plot_data['total_kwh'].tolist() if hasattr(plot_data['total_kwh'], 'tolist') else list(plot_data['total_kwh']),
-                'total_cost': plot_data['total_cost'].tolist() if hasattr(plot_data['total_cost'], 'tolist') else list(plot_data['total_cost']),
-                'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
-                'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
-                'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
-                          (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
-                'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date'])
+                'total_kwh': safe_convert_to_list(plot_data['total_kwh'], 0.0),
+                'total_cost': safe_convert_to_list(plot_data['total_cost'], 0.0),
+                'cost_per_kwh': safe_convert_to_list(plot_data['cost_per_kwh'], 0.0),
+                'location': safe_convert_to_list(plot_data['location'], 'Unknown'),
+                'provider': safe_convert_to_list(plot_data['provider'] if 'provider' in plot_data else ['Unknown'] * len(plot_data), 'Unknown'),
+                'date': safe_convert_to_list(plot_data['date'])
             }
             
             figures['charging_duration'] = px.scatter(
@@ -667,15 +719,14 @@ def create_visualizations(data):
             )
     else:
         # If peak_kw is not available, create an alternative visualization
-        # Create a clean dictionary for plotly to avoid Series issues
+        # Create a clean dictionary for plotly using our safe conversion helper
         alt_dict = {
-            'total_kwh': plot_data['total_kwh'].tolist() if hasattr(plot_data['total_kwh'], 'tolist') else list(plot_data['total_kwh']),
-            'total_cost': plot_data['total_cost'].tolist() if hasattr(plot_data['total_cost'], 'tolist') else list(plot_data['total_cost']),
-            'cost_per_kwh': plot_data['cost_per_kwh'].tolist() if hasattr(plot_data['cost_per_kwh'], 'tolist') else list(plot_data['cost_per_kwh']),
-            'location': plot_data['location'].tolist() if hasattr(plot_data['location'], 'tolist') else list(plot_data['location']),
-            'provider': plot_data['provider'].tolist() if 'provider' in plot_data and hasattr(plot_data['provider'], 'tolist') else 
-                      (list(plot_data['provider']) if 'provider' in plot_data else ['Unknown'] * len(plot_data)),
-            'date': plot_data['date'].tolist() if hasattr(plot_data['date'], 'tolist') else list(plot_data['date'])
+            'total_kwh': safe_convert_to_list(plot_data['total_kwh'], 0.0),
+            'total_cost': safe_convert_to_list(plot_data['total_cost'], 0.0),
+            'cost_per_kwh': safe_convert_to_list(plot_data['cost_per_kwh'], 0.0),
+            'location': safe_convert_to_list(plot_data['location'], 'Unknown'),
+            'provider': safe_convert_to_list(plot_data['provider'] if 'provider' in plot_data else ['Unknown'] * len(plot_data), 'Unknown'),
+            'date': safe_convert_to_list(plot_data['date'])
         }
         
         figures['charging_duration'] = px.scatter(

@@ -173,18 +173,37 @@ class GmailClient:
                 except:
                     date = None
             
-            # Get email body
+            # Initialize variables for attachments and body
+            attachments = []
             body = ""
+            
+            # Check if this is an EVCC email with CSV data
+            is_evcc_csv_email = "EVCC Charging Data" in subject
+            
+            # Process message parts
             if msg.is_multipart():
                 for part in msg.walk():
                     content_type = part.get_content_type()
                     content_disposition = str(part.get("Content-Disposition"))
                     
-                    # Skip attachments
+                    # Handle attachments
                     if "attachment" in content_disposition:
+                        # Get attachment filename
+                        filename = part.get_filename()
+                        if filename:
+                            # For CSV files, extract content
+                            if filename.lower().endswith('.csv'):
+                                attachment_data = part.get_payload(decode=True)
+                                if attachment_data:
+                                    # Store CSV data in attachments list
+                                    attachments.append({
+                                        'filename': filename,
+                                        'type': 'csv',
+                                        'data': attachment_data
+                                    })
                         continue
                     
-                    # Get text parts
+                    # Get text parts for body
                     if content_type == "text/plain":
                         payload = part.get_payload(decode=True)
                         if payload:
@@ -192,6 +211,7 @@ class GmailClient:
                             body = payload.decode(charset, errors='replace')
                         break
             else:
+                # Non-multipart message - just get the body
                 payload = msg.get_payload(decode=True)
                 if payload:
                     charset = msg.get_content_charset() or 'utf-8'
@@ -207,7 +227,9 @@ class GmailClient:
                 'subject': subject,
                 'from': from_email,
                 'date': date,
-                'body': body
+                'body': body,
+                'attachments': attachments,
+                'is_evcc_csv_email': is_evcc_csv_email
             }
             
         except Exception as e:

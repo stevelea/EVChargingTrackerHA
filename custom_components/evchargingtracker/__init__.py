@@ -31,7 +31,7 @@ CONFIG_SCHEMA = vol.Schema(
         "evchargingtracker": vol.Schema(
             {
                 vol.Required(CONF_HOST): cv.string,
-                vol.Required(CONF_PORT, default=5001): cv.port,
+                vol.Required(CONF_PORT, default=8000): cv.port,
                 vol.Optional(CONF_API_KEY): cv.string,
             }
         )
