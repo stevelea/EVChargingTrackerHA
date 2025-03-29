@@ -15,8 +15,23 @@ class EVChargingTrackerApiClient:
         self, session: aiohttp.ClientSession, base_url: str, api_key: Optional[str] = None
     ):
         """Initialize the API client."""
-        self._session = session
+        # Clean up the base URL - remove any trailing slashes
         self._base_url = base_url.rstrip("/")
+        
+        # CRITICAL CHANGE: For Replit URLs, ensure we're using HTTPS without port specification
+        if '.replit.app' in self._base_url:
+            # Extract the domain without protocol or port
+            domain_only = self._base_url
+            # Remove protocol if present
+            domain_only = domain_only.replace('http://', '').replace('https://', '')
+            # Remove port if present
+            if ':' in domain_only:
+                domain_only = domain_only.split(':')[0]
+            # Use HTTPS with the clean domain
+            self._base_url = f"https://{domain_only}"
+            _LOGGER.info(f"Detected Replit URL, using: {self._base_url}")
+            
+        self._session = session
         self._api_key = api_key
         # Use X-API-Key header (note the capitalization) to match the Flask API's expected format
         self._headers = {"X-API-Key": api_key} if api_key else {}
@@ -49,18 +64,21 @@ class EVChargingTrackerApiClient:
         # Format the base URL correctly (remove trailing slash if present)
         base_url = self._base_url.rstrip('/')
         
-        # Special handling for Replit URLs (they may need a port specified)
+        # Special handling for Replit URLs - ensure HTTPS but DO NOT add port
         if '.replit.app' in base_url:
-            # For Replit deployments, ensure it uses HTTPS and handle port properly
+            # For Replit deployments, ensure it uses HTTPS
             if not base_url.startswith('https://') and not base_url.startswith('http://'):
                 base_url = f"https://{base_url}"
                 
-            # Add port 8000 if not already included and if it's not using a standard HTTPS port
-            # Only add port if not already present in the URL (check for any port specification)
-            if not any(f":{port}" in base_url for port in ['443', '8000', '5000']):
-                base_url = f"{base_url}:8000"
+            # CRITICAL CHANGE: Remove any port specification from Replit URLs
+            # Extract the domain without any port
+            if ':' in base_url.replace('https://', '').replace('http://', ''):
+                # There's a port specified, remove it
+                protocol = 'https://' if base_url.startswith('https://') else 'http://'
+                domain = base_url.replace('https://', '').replace('http://', '').split(':')[0]
+                base_url = f"{protocol}{domain}"
                 
-            _LOGGER.debug("Adjusted Replit URL to: %s", base_url)
+            _LOGGER.debug("Adjusted Replit URL (no port) to: %s", base_url)
         
         # Combine to form the complete URL
         url = f"{base_url}{endpoint}"
@@ -146,11 +164,11 @@ class EVChargingTrackerApiClient:
                 _LOGGER.warning("Attempt 2 failed: %s", e2)
                 all_attempts.append(("health without prefix", f"Error: {e2}"))
 
-            # Third attempt - try direct URL with standard port 8000
+            # Third attempt - try direct URL hitting the API endpoint directly using path format
             if '.replit.app' in self._base_url:
                 clean_domain = self._base_url.replace('http://', '').replace('https://', '').split(':')[0]
-                direct_url = f"https://{clean_domain}:8000/api/health"
-                _LOGGER.info("Attempt 3: Trying direct URL with port 8000: %s", direct_url)
+                direct_url = f"https://{clean_domain}/api/health"
+                _LOGGER.info("Attempt 3: Trying direct URL with path format: %s", direct_url)
                 try:
                     timeout = aiohttp.ClientTimeout(total=10)
                     async with self._session.get(
@@ -159,25 +177,26 @@ class EVChargingTrackerApiClient:
                         if response.status == 200:
                             try:
                                 result3 = await response.json()
-                                all_attempts.append(("direct URL port 8000", result3))
+                                all_attempts.append(("direct URL with path", result3))
                                 _LOGGER.info("Attempt 3 response: %s", result3)
                                 if result3 and isinstance(result3, dict) and "status" in result3:
                                     return result3
                             except Exception as e3:
                                 _LOGGER.warning("Attempt 3 parsing failed: %s", e3)
-                                all_attempts.append(("direct URL port 8000", f"Parse error: {e3}"))
+                                all_attempts.append(("direct URL with path", f"Parse error: {e3}"))
                         else:
                             _LOGGER.warning("Attempt 3 failed with status: %s", response.status)
-                            all_attempts.append(("direct URL port 8000", f"Status: {response.status}"))
+                            all_attempts.append(("direct URL with path", f"Status: {response.status}"))
                 except Exception as e3:
                     _LOGGER.warning("Attempt 3 request failed: %s", e3)
-                    all_attempts.append(("direct URL port 8000", f"Error: {e3}"))
+                    all_attempts.append(("direct URL with path", f"Error: {e3}"))
 
-            # Fourth attempt - try direct URL without port specification
+            # Fourth attempt - try a different endpoint (/api/summary) on Replit
             if '.replit.app' in self._base_url:
                 clean_domain = self._base_url.replace('http://', '').replace('https://', '').split(':')[0]
-                direct_url = f"https://{clean_domain}/api/health"
-                _LOGGER.info("Attempt 4: Trying direct URL without port: %s", direct_url)
+                # Use a different endpoint for variety
+                direct_url = f"https://{clean_domain}/api/summary"
+                _LOGGER.info("Attempt 4: Trying summary endpoint directly: %s", direct_url)
                 try:
                     timeout = aiohttp.ClientTimeout(total=10)
                     async with self._session.get(
@@ -186,19 +205,20 @@ class EVChargingTrackerApiClient:
                         if response.status == 200:
                             try:
                                 result4 = await response.json()
-                                all_attempts.append(("direct URL no port", result4))
+                                all_attempts.append(("direct summary endpoint", result4))
                                 _LOGGER.info("Attempt 4 response: %s", result4)
-                                if result4 and isinstance(result4, dict) and "status" in result4:
-                                    return result4
+                                if result4 and isinstance(result4, dict):
+                                    # Convert summary response to standard health format
+                                    return {"status": "ok", "data_source": "summary", "timestamp": result4.get("last_update", "")}
                             except Exception as e4:
                                 _LOGGER.warning("Attempt 4 parsing failed: %s", e4)
-                                all_attempts.append(("direct URL no port", f"Parse error: {e4}"))
+                                all_attempts.append(("direct summary endpoint", f"Parse error: {e4}"))
                         else:
                             _LOGGER.warning("Attempt 4 failed with status: %s", response.status)
-                            all_attempts.append(("direct URL no port", f"Status: {response.status}"))
+                            all_attempts.append(("direct summary endpoint", f"Status: {response.status}"))
                 except Exception as e4:
                     _LOGGER.warning("Attempt 4 request failed: %s", e4)
-                    all_attempts.append(("direct URL no port", f"Error: {e4}"))
+                    all_attempts.append(("direct summary endpoint", f"Error: {e4}"))
 
             # If all approaches fail, try the summary endpoint as a last resort
             _LOGGER.info("Attempt 5: Trying summary endpoint as last resort")

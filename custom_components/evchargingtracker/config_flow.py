@@ -35,9 +35,10 @@ async def validate_api_connection(
             clean_host = clean_host.split(':')[0]
             _LOGGER.info("Extracted clean hostname from Replit URL: %s", clean_host)
         
-        # Build proper base URL for Replit with HTTPS
-        base_url = f"https://{clean_host}:8000"
-        _LOGGER.info("Using Replit URL format with forced port 8000: %s", base_url)
+        # CRITICAL CHANGE: For Replit, DO NOT add port to the URL - use the /api base path instead
+        # This is because Replit only exposes port 443 publicly
+        base_url = f"https://{clean_host}"
+        _LOGGER.info("Using Replit URL format without port (public HTTPS): %s", base_url)
     else:
         # For standard host:port combinations
         base_url = f"http://{host}:{port}"
