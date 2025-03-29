@@ -390,49 +390,52 @@ def proxy_streamlit(path):
     Proxy all non-API routes to the Streamlit server.
     This allows us to handle both API and Streamlit on the same port.
     """
-    # Handle API-related paths
-    if path.startswith('api'):
+    # Handle API-related paths - check for both 'api' and 'api/' to capture all forms
+    if path.startswith('api') or path == 'api':
+        # Normalize path - ensure it doesn't have leading slash for our checks
+        norm_path = path[1:] if path.startswith('/') else path
+        
         # For API root
-        if path == 'api':
+        if norm_path == 'api' or norm_path == 'api/':
             return api_root()
             
         # For API health endpoint
-        if path == 'api/health':
+        if norm_path == 'api/health':
             return api_health()
             
         # For API charging data endpoint 
-        if path == 'api/charging-data':
+        if norm_path == 'api/charging-data':
             return get_charging_data()
             
         # For specific charging record
-        if path.startswith('api/charging-data/') and len(path.split('/')) >= 3:
-            record_id = path.split('/')[2]
+        if norm_path.startswith('api/charging-data/') and len(norm_path.split('/')) >= 3:
+            record_id = norm_path.split('/')[2]
             return get_charging_record(record_id)
             
         # For API summary endpoint
-        if path == 'api/summary':
+        if norm_path == 'api/summary':
             return get_charging_summary()
             
         # For API users endpoint
-        if path == 'api/users':
+        if norm_path == 'api/users':
             return get_users()
             
         # Background API endpoints if available
         if BACKGROUND_AVAILABLE:
             # Background status
-            if path == 'api/background/status':
+            if norm_path == 'api/background/status':
                 return background_status()
                 
             # Background start
-            if path == 'api/background/start':
+            if norm_path == 'api/background/start' and request.method == 'POST':
                 return background_start()
                 
             # Background stop
-            if path == 'api/background/stop':
+            if norm_path == 'api/background/stop' and request.method == 'POST':
                 return background_stop()
                 
             # Background refresh
-            if path == 'api/background/refresh':
+            if norm_path == 'api/background/refresh' and request.method == 'POST':
                 return background_refresh()
             
         # For unknown API endpoints
@@ -452,6 +455,18 @@ def proxy_streamlit(path):
             ]
         }), 404
     
+    # Check for API endpoints without the prefix but with leading slash
+    if path == 'health' or path == 'charging-data' or path == 'summary' or path == 'users':
+        # Handle direct API endpoint calls without the /api prefix
+        if path == 'health':
+            return api_health()
+        elif path == 'charging-data':
+            return get_charging_data()
+        elif path == 'summary':
+            return get_charging_summary()
+        elif path == 'users':
+            return get_users()
+    
     # Quick check for health endpoint
     if path == 'health' or path == '_stcore/health':
         return jsonify({"status": "ok"}), 200
@@ -461,8 +476,10 @@ def proxy_streamlit(path):
         if path.startswith('_stcore/'):
             return jsonify({"status": "ok"}), 200
             
-        # For the main app or other paths, redirect to the Streamlit app
-        return redirect(f"https://ev-charging-tracker-stevelea1.replit.app/{path}")
+        # For the main app or other paths, proxy to the Streamlit server
+        proxied_url = f"http://{STREAMLIT_HOST}/{path}"
+        response = requests.get(proxied_url)
+        return Response(response.content, response.status_code, content_type=response.headers.get('Content-Type'))
         
     except Exception as e:
         app.logger.error(f"Error handling request: {str(e)}")
