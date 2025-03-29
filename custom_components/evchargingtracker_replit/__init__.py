@@ -3,76 +3,118 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
-import voluptuous as vol
+# Don't try to import voluptuous unless it's installed
+try:
+    import voluptuous as vol
+    HAS_VOLUPTUOUS = True
+except ImportError:
+    HAS_VOLUPTUOUS = False
+    vol = None
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_API_KEY,
-    CONF_HOST,
-    CONF_PORT,
-    Platform,
-)
-from homeassistant.core import HomeAssistant
-import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+# Import Home Assistant components with error handling
+try:
+    from homeassistant.const import (
+        CONF_API_KEY,
+        CONF_HOST,
+        CONF_PORT,
+    )
+    from homeassistant.core import HomeAssistant
+    from homeassistant.config_entries import ConfigEntry
+    # In HA 2023.11.0 and later, use the Platform enum
+    try:
+        from homeassistant.const import Platform
+        PLATFORMS = [Platform.SENSOR]
+    except ImportError:
+        # For older versions of Home Assistant
+        PLATFORMS = ["sensor"]
+    
+    import homeassistant.helpers.config_validation as cv
+    from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+    HAS_HA_COMPONENTS = True
+except ImportError as e:
+    HAS_HA_COMPONENTS = False
+    logging.getLogger(__name__).error(f"Failed to import Home Assistant components: {e}")
 
 _LOGGER = logging.getLogger(__name__)
-
-# Supported platforms
-PLATFORMS = [Platform.SENSOR]
-
-# Configuration schema
-CONFIG_SCHEMA = vol.Schema(
-    {
-        "evchargingtracker_replit": vol.Schema(
-            {
-                vol.Required(CONF_HOST): cv.string,
-                vol.Required(CONF_PORT, default=5000): cv.port,
-                vol.Optional(CONF_API_KEY): cv.string,
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
 
 # Update interval (60 seconds)
 UPDATE_INTERVAL = timedelta(seconds=60)
 
+# Configuration schema - only define if voluptuous is available
+if HAS_VOLUPTUOUS and 'cv' in locals():
+    CONFIG_SCHEMA = vol.Schema(
+        {
+            "evchargingtracker_replit": vol.Schema(
+                {
+                    vol.Required(CONF_HOST, default="ev-charging-tracker.replit.app"): cv.string,
+                    vol.Required(CONF_PORT, default=5000): cv.port,
+                    vol.Optional(CONF_API_KEY): cv.string,
+                }
+            )
+        },
+        extra=vol.ALLOW_EXTRA,
+    )
+
 
 async def async_setup(hass: HomeAssistant, config: Dict) -> bool:
     """Set up the EV Charging Tracker Replit component."""
+    _LOGGER.info("Initializing EV Charging Tracker Replit integration")
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up EV Charging Tracker Replit from a config entry."""
-    _LOGGER.info("Setting up EV Charging Tracker Replit integration")
+    _LOGGER.info("Setting up EV Charging Tracker Replit integration with config entry")
     
-    # Create update coordinator with demo data
-    coordinator = EVChargingTrackerReplitDataUpdateCoordinator(hass)
+    if not HAS_HA_COMPONENTS:
+        _LOGGER.error("Missing required Home Assistant components. Integration cannot be set up.")
+        return False
     
-    # Fetch initial data
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        # Create update coordinator with demo data
+        coordinator = EVChargingTrackerReplitDataUpdateCoordinator(hass)
+        
+        # Fetch initial data
+        _LOGGER.debug("Performing initial data refresh")
+        await coordinator.async_config_entry_first_refresh()
+        _LOGGER.debug("Initial data refresh completed")
 
-    # Store the coordinator
-    hass.data.setdefault("evchargingtracker_replit", {})[entry.entry_id] = coordinator
+        # Store the coordinator
+        hass.data.setdefault("evchargingtracker_replit", {})[entry.entry_id] = coordinator
+        _LOGGER.debug("Coordinator stored in hass.data")
 
-    # Set up platforms
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        # Set up platforms
+        _LOGGER.debug("Setting up sensor platform")
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        _LOGGER.info("EV Charging Tracker Replit integration setup completed successfully")
 
-    return True
+        return True
+    except Exception as err:
+        _LOGGER.error(f"Failed to set up EV Charging Tracker Replit integration: {err}")
+        import traceback
+        _LOGGER.error(traceback.format_exc())
+        return False
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # Unload platforms
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    _LOGGER.info("Unloading EV Charging Tracker Replit integration")
+    
+    try:
+        # Unload platforms
+        _LOGGER.debug("Unloading platforms")
+        unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    # Remove coordinator
-    if unload_ok:
-        hass.data["evchargingtracker_replit"].pop(entry.entry_id)
+        # Remove coordinator
+        if unload_ok and "evchargingtracker_replit" in hass.data:
+            _LOGGER.debug("Removing coordinator from hass.data")
+            hass.data["evchargingtracker_replit"].pop(entry.entry_id, None)
 
-    return unload_ok
+        _LOGGER.info("EV Charging Tracker Replit integration unloaded successfully")
+        return unload_ok
+    except Exception as err:
+        _LOGGER.error(f"Error unloading EV Charging Tracker Replit integration: {err}")
+        return False
 
 
 class EVChargingTrackerReplitDataUpdateCoordinator(DataUpdateCoordinator):
@@ -80,7 +122,22 @@ class EVChargingTrackerReplitDataUpdateCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass: HomeAssistant):
         """Initialize the coordinator."""
-        self.data = {"summary": {}, "latest_record": {}}
+        _LOGGER.debug("Initializing data coordinator")
+        # Initialize with empty data structure
+        self.data = {
+            "summary": {
+                "total_energy_kwh": 0,
+                "total_cost": 0,
+                "avg_cost_per_kwh": 0,
+                "record_count": 0,
+                "simulated": True
+            },
+            "latest_record": {
+                "id": "sim_init",
+                "date": datetime.now().isoformat(),
+                "simulated": True
+            }
+        }
 
         super().__init__(
             hass,
@@ -88,16 +145,16 @@ class EVChargingTrackerReplitDataUpdateCoordinator(DataUpdateCoordinator):
             name="EV Charging Tracker Replit",
             update_interval=UPDATE_INTERVAL,
         )
+        _LOGGER.debug("Data coordinator initialized")
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from demo dataset."""
         try:
-            # Create base synthetic data for Replit deployments
-            from datetime import datetime, timedelta
-            
+            _LOGGER.debug("Updating data")
             # Update the timestamps to current time
             now = datetime.now()
             
+            # Create synthetic data with current timestamps
             synthetic_data = {
                 "summary": {
                     "total_energy_kwh": 243.5,
@@ -141,10 +198,12 @@ class EVChargingTrackerReplitDataUpdateCoordinator(DataUpdateCoordinator):
                 }
             }
             
-            # Log that we're returning demo data
-            _LOGGER.info("EV Charging Tracker Replit: Returning demo data")
+            _LOGGER.info("EV Charging Tracker Replit: Generated demo data with timestamp %s", now.isoformat())
             
             return synthetic_data
         except Exception as err:
             _LOGGER.error("Error updating EV Charging Tracker Replit data: %s", err)
-            raise UpdateFailed(f"Error updating data: {err}") from err
+            import traceback
+            _LOGGER.error(traceback.format_exc())
+            # Return the previous data instead of failing
+            return self.data
