@@ -4,19 +4,38 @@ import io
 import re
 import os
 import json
+import base64
+import hashlib
 
 # Paths for saving credentials
 CREDENTIALS_FILE = "credentials.json"
 
-def save_credentials(email_address):
+def save_credentials(email_address, password=None):
     """
-    Save email address to a file for future use
+    Save email address and optionally encrypted password to a file for future use
     
     Args:
         email_address: User's Gmail address to save
+        password: Optional app password to save (will be encrypted)
     """
     try:
         data = {"email_address": email_address}
+        
+        # Encrypt and store password if provided
+        if password:
+            # Generate a simple encryption key based on the email address
+            # This is basic encryption and shouldn't be used for high-security applications
+            key = hashlib.sha256(email_address.encode()).digest()[:16]
+            
+            # Encrypt the password using a simple XOR cipher
+            encrypted = []
+            for i, char in enumerate(password):
+                key_char = key[i % len(key)]
+                encrypted.append(ord(char) ^ key_char)
+            
+            # Convert to base64 for storage
+            encoded = base64.b64encode(bytes(encrypted)).decode('utf-8')
+            data["password"] = encoded
         
         # Save to file
         with open(CREDENTIALS_FILE, "w") as f:
@@ -29,15 +48,41 @@ def save_credentials(email_address):
 
 def load_credentials():
     """
-    Load saved email address from file
+    Load saved email address and decrypted password from file
     
     Returns:
-        Dictionary with email_address key or None if not found
+        Dictionary with email_address and password keys or None if not found
     """
     try:
         if os.path.exists(CREDENTIALS_FILE):
             with open(CREDENTIALS_FILE, "r") as f:
-                return json.load(f)
+                data = json.load(f)
+                
+                # If password exists and email exists, decrypt it
+                if "password" in data and "email_address" in data:
+                    try:
+                        # Generate the same key used for encryption
+                        email = data["email_address"]
+                        key = hashlib.sha256(email.encode()).digest()[:16]
+                        
+                        # Decode from base64
+                        encrypted = base64.b64decode(data["password"])
+                        
+                        # Decrypt using XOR
+                        decrypted = []
+                        for i, byte in enumerate(encrypted):
+                            key_char = key[i % len(key)]
+                            decrypted.append(chr(byte ^ key_char))
+                        
+                        # Store decrypted password
+                        data["password"] = ''.join(decrypted)
+                    except Exception as decrypt_err:
+                        print(f"Error decrypting password: {str(decrypt_err)}")
+                        # Remove password key if decryption fails
+                        if "password" in data:
+                            del data["password"]
+                
+                return data
         return None
     except Exception as e:
         print(f"Error loading credentials: {str(e)}")

@@ -24,6 +24,13 @@ from predictive_analysis import (
 )
 from network_map import display_charging_network_map
 
+# Import background tasks
+try:
+    import background
+    BACKGROUND_AVAILABLE = True
+except ImportError:
+    BACKGROUND_AVAILABLE = False
+
 # Import test data creator
 import create_test_data
 
@@ -204,6 +211,8 @@ with st.sidebar:
                                           value=st.session_state.saved_email)
             app_password = st.text_input("Enter the App Password:", key="app_password", type="password")
             save_email = st.checkbox("Remember my email address", value=True)
+            save_password = st.checkbox("Remember my password for auto-refresh (encrypted)", value=False)
+            enable_auto_refresh = st.checkbox("Automatically refresh data every 10 minutes", value=False)
             
             if st.button("Connect to Gmail"):
                 if email_address and app_password:
@@ -214,10 +223,23 @@ with st.sidebar:
                             
                             # Save credentials if requested
                             if save_email:
-                                save_credentials(email_address)
+                                if save_password:
+                                    # Save both email and password
+                                    save_credentials(email_address, app_password)
+                                else:
+                                    # Save only email
+                                    save_credentials(email_address)
                             
                             # Set a flag to auto-fetch data after authentication
                             st.session_state.auto_fetch_data = True
+                            
+                            # Start background refresh if requested
+                            if BACKGROUND_AVAILABLE and save_password and enable_auto_refresh:
+                                try:
+                                    background.start_background_refresh(10)  # 10-minute interval
+                                    st.session_state.background_refresh_enabled = True
+                                except Exception as e:
+                                    st.warning(f"Couldn't start auto-refresh: {str(e)}")
                                 
                             st.success("Authentication successful! Automatically fetching your charging data...")
                             st.rerun()
@@ -266,6 +288,95 @@ with st.sidebar:
             st.session_state.tesla_authenticated = False
             st.session_state.tesla_client = TeslaApiClient()  # Reset the client
             st.rerun()
+    
+    # Background refresh management (only show if authenticated and background module is available)
+    if st.session_state.authenticated and BACKGROUND_AVAILABLE:
+        st.subheader("Background Refresh")
+        
+        # Check if saved password exists
+        credentials = load_credentials()
+        has_saved_password = credentials and 'password' in credentials
+        
+        # Get background status
+        if 'background_refresh_enabled' not in st.session_state:
+            try:
+                status = background.get_background_status()
+                st.session_state.background_refresh_enabled = status.get('running', False)
+                st.session_state.background_last_refresh = status.get('last_refresh')
+                st.session_state.background_interval = status.get('interval_minutes', 10)
+            except Exception:
+                st.session_state.background_refresh_enabled = False
+                st.session_state.background_last_refresh = None
+                st.session_state.background_interval = 10
+        
+        # Show current status
+        if st.session_state.background_refresh_enabled:
+            st.success("Background refresh is active")
+            
+            # Show last refresh time if available
+            if st.session_state.background_last_refresh:
+                st.info(f"Last auto-refresh: {st.session_state.background_last_refresh}")
+            
+            # Stop button
+            if st.button("Stop Background Refresh"):
+                try:
+                    if background.stop_background_refresh():
+                        st.session_state.background_refresh_enabled = False
+                        st.success("Background refresh stopped")
+                        st.rerun()
+                    else:
+                        st.error("Failed to stop background refresh")
+                except Exception as e:
+                    st.error(f"Error stopping background refresh: {str(e)}")
+        else:
+            if has_saved_password:
+                st.info("Background refresh is available but not running")
+                
+                # Interval selection
+                interval = st.slider("Refresh interval (minutes)", 5, 60, 10, 5)
+                
+                # Start button
+                if st.button("Start Background Refresh"):
+                    try:
+                        if background.start_background_refresh(interval):
+                            st.session_state.background_refresh_enabled = True
+                            st.session_state.background_interval = interval
+                            st.success("Background refresh started")
+                            st.rerun()
+                        else:
+                            st.error("Failed to start background refresh")
+                    except Exception as e:
+                        st.error(f"Error starting background refresh: {str(e)}")
+            else:
+                st.warning("To enable background refresh, you need to save your password.")
+                st.info("You can do this when logging in by checking 'Remember my password for auto-refresh'")
+        
+        # Manual refresh button (always available)
+        if st.button("Refresh Data Now"):
+            try:
+                # Check if we have saved credentials
+                credentials = load_credentials()
+                if credentials and 'email_address' in credentials and 'password' in credentials:
+                    with st.spinner("Refreshing data..."):
+                        success, message, count = background.refresh_data(
+                            credentials['email_address'], 
+                            credentials['password']
+                        )
+                        if success:
+                            if count > 0:
+                                st.success(f"Successfully found {count} new charging records!")
+                            else:
+                                st.info("No new charging records found.")
+                            
+                            # Update the data in the session
+                            load_user_data(credentials['email_address'])
+                            st.rerun()
+                        else:
+                            st.error(f"Failed to refresh data: {message}")
+                else:
+                    st.error("No saved credentials available for refresh.")
+            except Exception as e:
+                st.error(f"Error performing manual refresh: {str(e)}")
     
     # Database Cleaning section (only show if authenticated)
     if st.session_state.authenticated:

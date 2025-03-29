@@ -1,6 +1,7 @@
 """
 API server for exposing the EV charging data to external applications.
 This provides endpoints to access stored charging data in a RESTful manner.
+It also provides background task management for automated data refresh.
 """
 
 from flask import Flask, jsonify, request, abort
@@ -10,6 +11,14 @@ import hmac
 import data_storage
 from datetime import datetime
 import hashlib
+import utils
+
+# Import background task module
+try:
+    import background
+    BACKGROUND_AVAILABLE = True
+except ImportError:
+    BACKGROUND_AVAILABLE = False
 
 app = Flask(__name__)
 
@@ -267,6 +276,89 @@ def server_error(error):
         'message': 'An unexpected error occurred'
     }), 500
 
+# Background task management endpoints
+if BACKGROUND_AVAILABLE:
+    @app.route('/api/background/status', methods=['GET'])
+    def background_status():
+        """Get the status of the background refresh task"""
+        # Validate API key
+        if not validate_api_key():
+            abort(401, description="Invalid or missing API key")
+        
+        status = background.get_background_status()
+        return jsonify(status)
+    
+    @app.route('/api/background/start', methods=['POST'])
+    def background_start():
+        """Start the background refresh task"""
+        # Validate API key
+        if not validate_api_key():
+            abort(401, description="Invalid or missing API key")
+        
+        # Get the interval parameter (default to 10 minutes)
+        try:
+            interval = int(request.json.get('interval', 10))
+        except (ValueError, TypeError):
+            interval = 10
+        
+        # Start the background task
+        success = background.start_background_refresh(interval)
+        
+        return jsonify({
+            'success': success,
+            'message': 'Background refresh task started' if success else 'Task already running',
+            'interval_minutes': interval
+        })
+    
+    @app.route('/api/background/stop', methods=['POST'])
+    def background_stop():
+        """Stop the background refresh task"""
+        # Validate API key
+        if not validate_api_key():
+            abort(401, description="Invalid or missing API key")
+        
+        # Stop the background task
+        success = background.stop_background_refresh()
+        
+        return jsonify({
+            'success': success,
+            'message': 'Background refresh task stopped' if success else 'No task was running'
+        })
+    
+    @app.route('/api/background/refresh', methods=['POST'])
+    def background_refresh():
+        """Perform a one-time refresh of the data"""
+        # Validate API key
+        if not validate_api_key():
+            abort(401, description="Invalid or missing API key")
+        
+        # Get email and password from request
+        email = request.json.get('email')
+        password = request.json.get('password')
+        
+        # If not provided, try to load from credentials
+        if not email or not password:
+            credentials = utils.load_credentials()
+            if credentials:
+                email = credentials.get('email_address')
+                password = credentials.get('password')
+        
+        # Perform the refresh
+        if email and password:
+            success, message, count = background.refresh_data(email, password)
+            
+            return jsonify({
+                'success': success,
+                'message': message,
+                'new_records': count
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No credentials provided or found',
+                'new_records': 0
+            })
+
 # Main entry point
 if __name__ == '__main__':
     
@@ -279,6 +371,20 @@ if __name__ == '__main__':
     # Generate a random API key if one isn't set
     if API_KEY == 'ev-charging-api-key':
         print("WARNING: Using default API key. Set API_KEY environment variable for better security.")
+    
+    # Start the background task if available and credentials exist
+    if BACKGROUND_AVAILABLE:
+        try:
+            # Check if we have credentials with password
+            credentials = utils.load_credentials()
+            if credentials and 'email_address' in credentials and 'password' in credentials:
+                print("Found saved credentials, starting background refresh task")
+                background.start_background_refresh()
+                print("Background refresh task started")
+            else:
+                print("No saved password found, background refresh not started automatically")
+        except Exception as e:
+            print(f"Warning: Failed to start background refresh: {str(e)}")
     
     # Start the server
     print(f"Starting API server on {host}:{port}")
