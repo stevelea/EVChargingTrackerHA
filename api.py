@@ -27,13 +27,12 @@ in_replit = os.environ.get('REPL_ID') is not None
 app = Flask(__name__)
 
 # Set URL prefix for all routes based on environment
-if in_replit:
-    # In Replit, we need to use a URL prefix to avoid conflicts with Streamlit
-    # Both applications will run on port 5000, but API will be under /api prefix
-    URL_PREFIX = '/api'
-else:
-    # No prefix needed for non-Replit environments
-    URL_PREFIX = ''
+# UPDATED: We're now exposing the API server directly on port 8000, so we don't need a prefix
+# This ensures paths like /health and /api/health both work
+URL_PREFIX = ''
+
+# But we'll also add duplicate routes with /api prefix for backwards compatibility
+HAS_API_PREFIX = True
 
 # API key variable (for simple authentication)
 API_KEY = os.environ.get('API_KEY', 'ev-charging-api-key')
@@ -373,6 +372,55 @@ if BACKGROUND_AVAILABLE:
                 'message': 'No credentials provided or found',
                 'new_records': 0
             })
+
+# Duplicate routes with /api prefix for backward compatibility
+if HAS_API_PREFIX:
+    @app.route(f'/api/health', methods=['GET'])
+    def health_check_prefixed():
+        """Health check endpoint with /api prefix"""
+        return health_check()
+    
+    @app.route(f'/api/charging-data', methods=['GET'])
+    def get_charging_data_prefixed():
+        """Get charging data with /api prefix"""
+        return get_charging_data()
+    
+    @app.route(f'/api/charging-data/<record_id>', methods=['GET'])
+    def get_charging_record_prefixed(record_id):
+        """Get a specific charging record with /api prefix"""
+        return get_charging_record(record_id)
+    
+    @app.route(f'/api/summary', methods=['GET'])
+    def get_charging_summary_prefixed():
+        """Get a summary with /api prefix"""
+        return get_charging_summary()
+    
+    @app.route(f'/api/users', methods=['GET'])
+    def get_users_prefixed():
+        """Get users with /api prefix"""
+        return get_users()
+    
+    # Background task management endpoints
+    if BACKGROUND_AVAILABLE:
+        @app.route(f'/api/background/status', methods=['GET'])
+        def background_status_prefixed():
+            """Get the status of the background refresh task with /api prefix"""
+            return background_status()
+        
+        @app.route(f'/api/background/start', methods=['POST'])
+        def background_start_prefixed():
+            """Start the background refresh task with /api prefix"""
+            return background_start()
+        
+        @app.route(f'/api/background/stop', methods=['POST'])
+        def background_stop_prefixed():
+            """Stop the background refresh task with /api prefix"""
+            return background_stop()
+        
+        @app.route(f'/api/background/refresh', methods=['POST'])
+        def background_refresh_prefixed():
+            """Perform a one-time refresh of the data with /api prefix"""
+            return background_refresh()
 
 # Main entry point
 if __name__ == '__main__':

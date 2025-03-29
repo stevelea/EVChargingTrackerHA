@@ -177,20 +177,64 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up EV Charging Tracker sensors based on config entry."""
-    coordinator = hass.data["evchargingtracker"][entry.entry_id]
+    # Super verbose debugging
+    _LOGGER.error("SETUP ENTRY CALLED with entry: %s", entry.as_dict())
     
-    # Create sensor entities
-    entities = []
-    for description in SENSOR_DESCRIPTIONS:
-        entities.append(
-            EVChargingTrackerSensor(
-                coordinator=coordinator,
-                entry_id=entry.entry_id,
-                description=description,
+    try:
+        coordinator = hass.data["evchargingtracker"][entry.entry_id]
+        _LOGGER.error("COORDINATOR FOUND: %s", coordinator)
+        _LOGGER.error("COORDINATOR API CLIENT: %s", coordinator.api_client)
+        _LOGGER.error("COORDINATOR API CLIENT BASE URL: %s", coordinator.api_client._base_url)
+        
+        # Try to manually check data
+        try:
+            _LOGGER.error("ATTEMPTING MANUAL API CALLS")
+            base_url = coordinator.api_client._base_url
+            
+            # Try direct access to Replit URLs to debug
+            if '.replit.app' in base_url:
+                import aiohttp
+                
+                # Try these alternative URLs directly
+                test_urls = [
+                    f"https://ev-charging-tracker-stevelea1.replit.app/api/health",
+                    f"https://ev-charging-tracker-stevelea1.replit.app/api/summary"
+                ]
+                
+                for url in test_urls:
+                    _LOGGER.error("TESTING DIRECT URL: %s", url)
+                    try:
+                        timeout = aiohttp.ClientTimeout(total=10)
+                        session = coordinator.api_client._session
+                        
+                        async with session.get(url, timeout=timeout) as response:
+                            _LOGGER.error("RESPONSE STATUS: %s", response.status)
+                            if response.status == 200:
+                                text = await response.text()
+                                _LOGGER.error("RESPONSE TEXT: %s", text[:200])
+                            else:
+                                _LOGGER.error("NON-200 RESPONSE")
+                    except Exception as e:
+                        _LOGGER.error("ERROR TESTING URL %s: %s", url, e)
+        except Exception as e:
+            _LOGGER.error("ERROR IN MANUAL API TESTING: %s", e)
+        
+        # Create sensor entities
+        entities = []
+        for description in SENSOR_DESCRIPTIONS:
+            entities.append(
+                EVChargingTrackerSensor(
+                    coordinator=coordinator,
+                    entry_id=entry.entry_id,
+                    description=description,
+                )
             )
-        )
-    
-    async_add_entities(entities, True)
+        
+        _LOGGER.error("CREATED %d SENSOR ENTITIES", len(entities))
+        async_add_entities(entities, True)
+        _LOGGER.error("ENTITIES ADDED")
+    except Exception as e:
+        _LOGGER.error("CRITICAL ERROR IN SENSOR SETUP: %s", e)
 
 
 class EVChargingTrackerSensor(CoordinatorEntity, SensorEntity):

@@ -149,6 +149,8 @@ class EVChargingTrackerDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from EV Charging Tracker API."""
+        _LOGGER.error("UPDATE DATA CALLED - STARTING API REQUESTS")
+        
         try:
             # Initialize defaults
             summary_result = {}
@@ -156,36 +158,65 @@ class EVChargingTrackerDataUpdateCoordinator(DataUpdateCoordinator):
             
             # Get summary data
             try:
+                _LOGGER.error("ATTEMPTING TO GET CHARGING SUMMARY")
                 summary_result = await self.api_client.async_get_charging_summary()
-                _LOGGER.debug("Summary result: %s", summary_result)
+                _LOGGER.error("SUMMARY RESULT: %s", summary_result)
+                
+                if not summary_result:
+                    # If summary is empty, attempt direct request
+                    _LOGGER.error("TRYING DIRECT SUMMARY REQUEST")
+                    if '.replit.app' in self.api_client._base_url:
+                        import aiohttp
+                        try:
+                            # Replit special case, try direct URL
+                            url = "https://ev-charging-tracker-stevelea1.replit.app/api/summary"
+                            _LOGGER.error("DIRECT REQUEST TO %s", url)
+                            timeout = aiohttp.ClientTimeout(total=10)
+                            headers = {"X-API-Key": self.api_client._api_key} if self.api_client._api_key else {}
+                            
+                            async with aiohttp.ClientSession() as direct_session:
+                                async with direct_session.get(url, headers=headers, timeout=timeout) as response:
+                                    _LOGGER.error("DIRECT SUMMARY RESPONSE: %s", response.status)
+                                    if response.status == 200:
+                                        direct_result = await response.json()
+                                        _LOGGER.error("DIRECT SUMMARY CONTENT: %s", direct_result)
+                                        summary_result = direct_result
+                        except Exception as direct_err:
+                            _LOGGER.error("DIRECT SUMMARY ERROR: %s", direct_err)
             except Exception as e:
                 _LOGGER.error("Error getting charging summary: %s", e)
                 # Don't raise an exception here; we'll try to get the charging data instead
             
             # Get charging data for latest record
             try:
+                _LOGGER.error("ATTEMPTING TO GET CHARGING DATA")
                 charging_data_result = await self.api_client.async_get_charging_data()
-                _LOGGER.debug("Charging data result: %s", charging_data_result)
+                _LOGGER.error("CHARGING DATA RESULT: %s", charging_data_result)
                 
                 # Extract records from response - handle different response formats
                 records = []
                 if isinstance(charging_data_result, dict):
                     records = charging_data_result.get("data", [])
                 
+                _LOGGER.error("EXTRACTED %d RECORDS", len(records))
+                
                 # Find latest record
                 if isinstance(records, list) and records:
                     try:
                         # Sort by date if available to get latest record
+                        _LOGGER.error("SORTING RECORDS BY DATE")
                         sorted_data = sorted(
                             records,
                             key=lambda x: x.get("date", ""),
                             reverse=True
                         )
                         latest_record = sorted_data[0]
+                        _LOGGER.error("LATEST RECORD: %s", latest_record)
                     except (KeyError, IndexError, TypeError) as e:
-                        _LOGGER.warning("Error sorting records: %s. Using first record instead.", e)
+                        _LOGGER.error("Error sorting records: %s. Using first record instead.", e)
                         if records:
                             latest_record = records[0]
+                            _LOGGER.error("USING FIRST RECORD: %s", latest_record)
             except Exception as e:
                 _LOGGER.error("Error getting charging data: %s", e)
                 # Don't raise an exception here; we'll continue with what we have
@@ -196,8 +227,25 @@ class EVChargingTrackerDataUpdateCoordinator(DataUpdateCoordinator):
                 "latest_record": latest_record
             }
             
+            _LOGGER.error("FINAL DATA: summary=%s, has_latest_record=%s", 
+                          bool(summary_result), bool(latest_record))
+            
+            # If we got no data at all, try one last direct attempt
+            if not summary_result and not latest_record:
+                _LOGGER.error("NO DATA RECEIVED - TRYING DIRECT HEALTH CHECK")
+                try:
+                    import aiohttp
+                    url = "https://ev-charging-tracker-stevelea1.replit.app/api/health"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                            status = response.status
+                            text = await response.text()
+                            _LOGGER.error("HEALTH CHECK RESPONSE: %s - %s", status, text)
+                except Exception as health_err:
+                    _LOGGER.error("HEALTH CHECK ERROR: %s", health_err)
+            
             return self.api_data
 
         except Exception as err:
-            _LOGGER.error("Error updating EV Charging Tracker data: %s", err)
+            _LOGGER.error("ERROR UPDATING EV CHARGING TRACKER DATA: %s", err)
             raise UpdateFailed(f"Error updating data: {err}") from err
