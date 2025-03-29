@@ -16,3 +16,6 @@ google-auth==2.27.0
 google-auth-oauthlib==1.2.0
 requests==2.31.0
 flask==3.0.0
+matplotlib==3.8.2
+twilio==8.10.0
+# We don't need replit in Docker

@@ -4,6 +4,7 @@ This script allows testing the EVCC CSV parser with the sample CSV file.
 """
 import os
 import sys
+import re
 import pandas as pd
 from data_parser import parse_evcc_csv
 import streamlit as st
@@ -103,7 +104,6 @@ def test_parse_evcc_csv():
         df = pd.DataFrame(charging_data)
         
         # Process duration to extract peak kW when missing
-        import re
         df = extract_peak_kw_from_duration(df)
         
         # Display sample data

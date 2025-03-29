@@ -16,19 +16,21 @@ COPY docker-requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r docker-requirements.txt
 
-# Create data directory
-RUN mkdir -p ./data
-
 # Copy application files
 COPY *.py .
 COPY .streamlit ./.streamlit
+COPY attached_assets ./attached_assets
+COPY test_deploy ./test_deploy
 
-# Expose the ports for both Streamlit and API server
-EXPOSE 5000 5001
+# Create necessary directories
+RUN mkdir -p ./data
+
+# Expose the single port for the combined app (proxy approach)
+EXPOSE 5000
 
 # Copy the startup script
 COPY start.sh .
 RUN chmod +x start.sh
 
-# Command to run both services
+# Command to run the combined service
 CMD ["./start.sh"]

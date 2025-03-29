@@ -6,7 +6,6 @@ services:
     container_name: ev-charging-tracker
     ports:
       - "5000:5000"
-      - "5001:5001"
     volumes:
       # Mount the data directory to persist charging data
       - ./data:/app/data
