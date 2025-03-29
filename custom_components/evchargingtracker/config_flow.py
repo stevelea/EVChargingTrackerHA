@@ -21,32 +21,31 @@ async def validate_api_connection(
     """Validate the user input allows us to connect to the API."""
     session = async_get_clientsession(hass)
     
+    # Log the initial input parameters
+    _LOGGER.info("Validating API connection with host=%s, port=%s", host, port)
+    
     # Format the base URL correctly
     # Handle Replit URLs separately (with special port handling)
     if '.replit.app' in host:
-        # For Replit deployments, ensure it uses HTTPS
-        if not host.startswith('http'):
-            if not host.startswith('https://'):
-                host = 'https://' + host
+        # For Replit deployments, ensure clean host without protocol
+        clean_host = host.replace('https://', '').replace('http://', '')
         
-        # When using a Replit domain, determine if a port is already specified
-        if any(f":{port_num}" in host for port_num in ['443', '8000', '5000']):
-            # Port already in URL, leave it as is
-            base_url = host
-            _LOGGER.debug("Using existing port in Replit URL: %s", base_url)
-        else:
-            # Add port 8000 by default
-            base_url = f"{host}:8000"
-            _LOGGER.debug("Adding port 8000 to Replit URL: %s", base_url)
+        # Remove any port that might be in the hostname
+        if ':' in clean_host:
+            clean_host = clean_host.split(':')[0]
+            _LOGGER.info("Extracted clean hostname from Replit URL: %s", clean_host)
+        
+        # Build proper base URL for Replit with HTTPS
+        base_url = f"https://{clean_host}:8000"
+        _LOGGER.info("Using Replit URL format with forced port 8000: %s", base_url)
     else:
         # For standard host:port combinations
         base_url = f"http://{host}:{port}"
-        _LOGGER.debug("Using standard URL format: %s", base_url)
-    
-    _LOGGER.debug("Creating API client with base URL: %s", base_url)
+        _LOGGER.info("Using standard URL format: %s", base_url)
     
     # Create the client
     client = EVChargingTrackerApiClient(session, base_url, api_key)
+    _LOGGER.info("Created API client with base URL: %s", base_url)
 
     try:
         # Attempt to check API health
