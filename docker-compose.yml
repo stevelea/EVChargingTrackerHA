@@ -8,5 +8,5 @@ services:
       - "5000:5000"
     volumes:
       # Mount the data directory to persist charging data
-      - /portainer/Files/AppData/evchargingtracker:/app/data
+      - /portainer/Files/AppData:/app/data
     restart: unless-stopped
