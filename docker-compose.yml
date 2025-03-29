@@ -9,4 +9,11 @@ services:
     volumes:
       # Mount the data directory to persist charging data
       - /portainer/Files/AppData:/app/data
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     restart: unless-stopped
+    
+networks:
+  default:
+    driver: bridge

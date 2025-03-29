@@ -13,8 +13,18 @@ This guide explains how to deploy the EV Charging Tracker application using Dock
 
 2. **Build and start the container**
 
-   From the root directory of the project, run:
+   From the root directory of the project, you can use either:
 
+   **Option A: Use the helper script (recommended):**
+   ```bash
+   # Make the script executable if needed
+   chmod +x docker-setup.sh
+   
+   # Run the setup script
+   ./docker-setup.sh
+   ```
+
+   **Option B: Use docker-compose directly:**
    ```bash
    docker-compose up -d
    ```
@@ -22,8 +32,10 @@ This guide explains how to deploy the EV Charging Tracker application using Dock
    This will:
    - Build the Docker image
    - Start a container in detached mode
-   - Mount the `./data` directory for persistent storage
+   - Mount the `/portainer/Files/AppData` directory for persistent storage
    - Expose the application on port 5000
+   
+   Note: If you encounter network issues during build, refer to the [Troubleshooting](#troubleshooting) section.
 
 3. **Access the application**
 
@@ -72,6 +84,20 @@ To modify the configuration:
 1. **Permission Issues**: If you encounter permission issues with the data directory, ensure the `/portainer/Files/AppData` directory has appropriate permissions
 
 2. **Port Conflicts**: If port 5000 is already in use, change the port mapping in `docker-compose.yml`
+
+3. **Docker Build Network Issues**: If you encounter network errors when building the Docker image (such as "failed to do request" or "i/o timeout" errors), try these solutions:
+
+   - The Dockerfile now uses a specific digest for the Python image, which can help with connectivity issues
+   - DNS servers (Google's 8.8.8.8 and 8.8.4.4) have been added to docker-compose.yml 
+   - If issues persist, try:
+     ```bash
+     # Pull the base image manually first
+     docker pull python:3.11-slim@sha256:d71b8eea6c9fcc6b25230361faf142c84f23ad4fbd1f852c8de96316a40a1add
+     
+     # Then build with no cache
+     docker-compose build --no-cache
+     ```
+   - Check your Docker daemon network settings and ensure there are no firewall rules blocking Docker Hub
 
 ## API Access
 
