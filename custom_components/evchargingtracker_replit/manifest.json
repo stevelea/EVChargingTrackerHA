@@ -1,0 +1,12 @@
+{
+  "domain": "evchargingtracker_replit",
+  "name": "EV Charging Tracker Replit",
+  "version": "1.0.0",
+  "documentation": "https://github.com/yourusername/evchargingtracker",
+  "issue_tracker": "https://github.com/yourusername/evchargingtracker/issues",
+  "dependencies": [],
+  "codeowners": ["@yourusername"],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "loggers": ["evchargingtracker_replit"]
+}

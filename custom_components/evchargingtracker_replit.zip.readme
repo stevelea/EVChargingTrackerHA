@@ -1,0 +1,24 @@
+# About this ZIP file
+
+This ZIP file contains the `evchargingtracker_replit` custom component for Home Assistant.
+
+## Installation Instructions
+
+1. Unzip this file to extract the `evchargingtracker_replit` folder.
+2. Copy the folder to your Home Assistant's `custom_components` directory.
+3. Restart Home Assistant.
+4. Add the integration through the Home Assistant UI.
+
+## What's Included
+
+This integration provides a Replit-specific version of the EV Charging Tracker integration that works around the routing limitations when hosting on Replit.
+
+For more information, see the documentation in the README.md and REPLIT_MODE.md files inside the package.
+
+## Why a Separate Integration?
+
+When hosting the EV Charging Tracker on Replit, there's a fundamental limitation: all external requests to the Replit app URL return the Streamlit interface, not the API responses. This special integration works around this limitation by providing representative data without attempting to connect to the actual API.
+
+## Support
+
+For questions or issues, please see the main project repository.

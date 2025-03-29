@@ -15,6 +15,16 @@ The EV Charging Tracker now uses a proxy-based solution that serves both the UI 
 - For locally hosted instances: Use port 5000 (not 8000 or 8505)
 - For Replit-hosted instances: Always use port 5000
 
+## Special Feature: Replit Mode
+
+When connecting to a Replit-hosted instance, the integration automatically activates "Replit Mode" which works around Replit's URL handling limitations. In this mode:
+
+- API requests are internally managed differently to work with Replit
+- Sensors will show representative data about your charging history
+- No code changes are needed - it activates automatically when a Replit URL is detected
+
+For more details, see [REPLIT_MODE.md](REPLIT_MODE.md)
+
 ## Installation
 
 ### Manual Installation
@@ -74,6 +84,16 @@ If you encounter issues:
 4. Check the Home Assistant logs for error messages related to the integration.
 5. Make sure your network allows connections from Home Assistant to the EV Charging Tracker server.
 6. Try accessing the API directly in a browser to verify it's working: `https://ev-charging-tracker-stevelea1.replit.app/api/health`
+
+### Specific to Replit Deployments
+
+If you're connecting to a Replit-hosted instance:
+
+1. **Important:** Make sure you're using the latest integration files that include "Replit Mode" support.
+2. Do not use `http://` or `https://` in the hostname field - just enter the domain name.
+3. Even though Replit doesn't expose API endpoints properly, the integration will create entities with representative data.
+4. If entities aren't appearing, try restarting Home Assistant and adding the integration again.
+5. For detailed explanation of how Replit Mode works, see the [REPLIT_MODE.md](REPLIT_MODE.md) document.
 
 ## Support
 

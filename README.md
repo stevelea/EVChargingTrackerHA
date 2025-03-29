@@ -130,7 +130,56 @@ print(f"Total Cost: ${summary.get('total_cost', 0)}")
 
 Check the `examples` directory for more comprehensive usage examples.
 
+## Home Assistant Integration
+
+The application can be integrated with Home Assistant to provide sensor entities for monitoring your EV charging data.
+
+### Local Network Setup
+
+For deployments on a local network (Docker, self-hosted), use the standard Home Assistant integration:
+
+1. Install the custom component:
+   ```bash
+   cp -r custom_components/evchargingtracker /path/to/your/homeassistant/custom_components/
+   ```
+
+2. Configure in Home Assistant:
+   - Host: Your server IP address
+   - Port: 8000 (the API port)
+   - API Key: The API key configured in your application
+
+### Replit Deployment Setup
+
+For Replit deployments, a special integration is provided due to Replit's unique routing constraints:
+
+1. Install the Replit-specific component:
+   ```bash
+   cp -r custom_components/evchargingtracker_replit /path/to/your/homeassistant/custom_components/
+   ```
+
+2. Configure in Home Assistant:
+   - Host: Your Replit app URL (e.g., `ev-charging-tracker-stevelea1.replit.app`)
+   - Port: 5000
+   - API Key: Any value (not used in Replit mode)
+
+3. Read the technical details in `custom_components/evchargingtracker_replit/REPLIT_MODE.md`
+
+### Sensors Available
+
+The integration provides several useful sensors including:
+
+- Total energy charged (kWh)
+- Total cost
+- Average cost per kWh
+- Charging session count
+- Latest charging location
+- Latest charging cost
+- Latest peak power
+- And more...
+
 ## Troubleshooting
+
+### Docker Deployment Issues
 
 - If the application is not accessible, check that Docker is running properly:
   ```bash
@@ -147,3 +196,16 @@ Check the `examples` directory for more comprehensive usage examples.
   ```bash
   docker logs ev-charging-tracker
   ```
+
+### Replit Deployment Issues
+
+- **API Access:** When hosting on Replit, all external requests to your Replit app URL will return the Streamlit interface, not the API. This is a fundamental limitation of Replit's routing infrastructure. For API access in this environment, use the special Home Assistant integration described above.
+
+- **Port Access:** Replit only exposes port 5000 publicly. All services (Streamlit UI and API) are routed through this port using the proxy application.
+
+- **Home Assistant Integration:** If you're trying to use the standard Home Assistant integration with a Replit-hosted instance, it will not work properly due to routing limitations. Use the special `evchargingtracker_replit` integration instead.
+
+- **Data Persistence:** Replit deployments use the Replit Database for data persistence. If you're experiencing data loss, ensure the application has proper permissions to access the Replit DB.
+
+For technical details on the Replit-specific limitations and workarounds, see:
+`custom_components/evchargingtracker_replit/REPLIT_MODE.md`
