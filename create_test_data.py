@@ -9,9 +9,13 @@ import os
 import data_storage
 import json
 
-def create_sample_charging_data():
+def create_sample_charging_data(email_address="test@example.com", num_records=30):
     """
     Create sample charging data for testing with realistic Australian locations
+    
+    Args:
+        email_address: Email address to save the data for (default: test@example.com)
+        num_records: Number of sample records to create (default: 30)
     """
     # Ensure data directory exists
     data_storage.ensure_data_directory()
@@ -43,11 +47,11 @@ def create_sample_charging_data():
         "EVCC"
     ]
     
-    # Generate 30 records spanning the last 90 days
+    # Generate records spanning the last 90 days
     end_date = datetime.datetime.now()
     start_date = end_date - datetime.timedelta(days=90)
     
-    for i in range(30):
+    for i in range(num_records):
         # Random date within range
         days_ago = random.randint(0, 90)
         charge_date = end_date - datetime.timedelta(days=days_ago)
@@ -92,23 +96,21 @@ def create_sample_charging_data():
         
         charging_data.append(record)
     
-    # Set up the test email address in session state
-    email_address = "test@example.com"
+    # Set up the email address in session state
     import streamlit as st
-    st.session_state["email_address"] = email_address
+    try:
+        st.session_state["email_address"] = email_address
+    except:
+        # Handle case when not running in Streamlit
+        pass
     
     # Sort by date (newest first)
     charging_data.sort(key=lambda x: x["date"], reverse=True)
     
-    # Save to test user data file
-    email_address = "test@example.com"
+    # Save to user data file
     data_storage.save_charging_data(charging_data, email_address)
     
     print(f"Created {len(charging_data)} test charging records for email: {email_address}")
-    
-    # Also save the test email in the session state
-    import streamlit as st
-    st.session_state["email_address"] = email_address
     
     return charging_data
 
