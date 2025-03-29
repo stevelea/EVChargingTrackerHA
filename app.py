@@ -298,16 +298,23 @@ with st.sidebar:
         has_saved_password = credentials and 'password' in credentials
         
         # Get background status
+        # Initialize background refresh session state variables
         if 'background_refresh_enabled' not in st.session_state:
-            try:
-                status = background.get_background_status()
-                st.session_state.background_refresh_enabled = status.get('running', False)
-                st.session_state.background_last_refresh = status.get('last_refresh')
-                st.session_state.background_interval = status.get('interval_minutes', 10)
-            except Exception:
-                st.session_state.background_refresh_enabled = False
-                st.session_state.background_last_refresh = None
-                st.session_state.background_interval = 10
+            st.session_state.background_refresh_enabled = False
+        if 'background_last_refresh' not in st.session_state:
+            st.session_state.background_last_refresh = None
+        if 'background_interval' not in st.session_state:
+            st.session_state.background_interval = 10
+            
+        # Then try to get the current status
+        try:
+            status = background.get_background_status()
+            st.session_state.background_refresh_enabled = status.get('running', False)
+            st.session_state.background_last_refresh = status.get('last_refresh')
+            st.session_state.background_interval = status.get('interval_minutes', 10)
+        except Exception:
+            # Session state variables already initialized above
+            pass
         
         # Show current status
         if st.session_state.background_refresh_enabled:
