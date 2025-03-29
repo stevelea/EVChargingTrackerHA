@@ -58,13 +58,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Special handling for Replit URLs
     if '.replit.app' in host:
-        # For Replit deployments, use HTTPS and handle port properly
-        if not host.startswith('http'):
-            host = f"https://{host}"
-        base_url = host
+        # Remove any existing protocol prefixes and ports for clean processing
+        clean_host = host.replace('https://', '').replace('http://', '')
+        if ':' in clean_host:
+            clean_host = clean_host.split(':')[0]  # Remove any port numbers
+            
+        # Now rebuild with proper HTTPS protocol
+        base_url = f"https://{clean_host}"
+        
+        # Force use of port 8000 for Replit deployments, since that's where our API runs
+        # Don't add port if it's going to be used as part of the subdomain pattern 
+        # (some Replit deployments use subdomains instead of ports)
+        base_url = f"{base_url}:8000"
+        
+        _LOGGER.info("Using Replit URL configuration: %s", base_url)
     else:
         # For standard host:port combinations
         base_url = f"http://{host}:{port}"
+        _LOGGER.info("Using standard URL configuration: %s", base_url)
 
     _LOGGER.debug("Creating API client with base URL: %s", base_url)
     api_client = EVChargingTrackerApiClient(
