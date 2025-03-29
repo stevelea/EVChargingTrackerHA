@@ -24,7 +24,8 @@ def safe_convert_to_list(series_obj, default_value=None):
     # Try different conversion methods
     try:
         # Check object type to detect Series objects (including narwhals.stable.v1.Series)
-        if "Series" in str(type(series_obj)):
+        obj_type = str(type(series_obj))
+        if "Series" in obj_type:
             # For Series, manually iterate through values
             result = []
             for i in range(len(series_obj)):
@@ -342,11 +343,20 @@ def create_visualizations(data):
             cost_col: safe_convert_to_list(plot_data[cost_col], 0.0)
         }
         
+        # Convert peak_kw_values to a list of standard Python floats to avoid any Series issues
+        # First double-check the values are all standard Python floats
+        safe_peak_kw = []
+        for val in peak_kw_values:
+            try:
+                safe_peak_kw.append(float(val))
+            except (TypeError, ValueError):
+                safe_peak_kw.append(5.0)
+        
         figures['time_series'] = px.scatter(
             plot_dict,  # Use dictionary instead of DataFrame to avoid Series conversion issues
             x='date',
             y=energy_col,  # Use the correct column name
-            size=peak_kw_values,  # Pass as explicit list of numeric values
+            size=safe_peak_kw,  # Pass as explicit list of Python floats
             color='cost_per_kwh',
             hover_name='location',
             hover_data={

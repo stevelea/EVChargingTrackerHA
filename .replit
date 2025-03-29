@@ -21,7 +21,7 @@ args = "streamlit_browser"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "combined_app"
+args = "evcc_test"
 
 [[workflows.workflow]]
 name = "streamlit_browser"
@@ -35,10 +35,10 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python -c \"import webbrowser; webbrowser.get('firefox').open('http://localhost:5000/')\""
+args = "python -c \"import webbrowser; webbrowser.open('http://localhost:5000')\""
 
 [[workflows.workflow]]
-name = "combined_app"
+name = "evcc_test"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -49,7 +49,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "ENABLE_TEST_DATA=true python run_proxy.py"
+args = "streamlit run test_evcc_csv.py --server.port 5000"
 waitForPort = 5000
 
 [[ports]]
