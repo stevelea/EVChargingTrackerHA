@@ -1,0 +1,428 @@
+[
+  {
+    "ID": 1,
+    "OperatorInfo": {
+      "Title": "Evie Networks",
+      "WebsiteURL": "https://evienetworks.com.au"
+    },
+    "AddressInfo": {
+      "Title": "Evie Networks Sydney CBD",
+      "AddressLine1": "42 Market Street",
+      "Town": "Sydney",
+      "StateOrProvince": "NSW",
+      "Postcode": "2000",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -33.8715,
+      "Longitude": 151.2070
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 33,
+          "Title": "CCS (Type 2)"
+        },
+        "StatusType": {
+          "ID": 0,
+          "Title": "Available"
+        },
+        "PowerKW": 150.0,
+        "Cost": "$0.40 per kWh"
+      },
+      {
+        "ConnectionType": {
+          "ID": 27,
+          "Title": "CHAdeMO"
+        },
+        "StatusType": {
+          "ID": 0,
+          "Title": "Available"
+        },
+        "PowerKW": 100.0,
+        "Cost": "$0.40 per kWh"
+      }
+    ],
+    "DateLastVerified": "2025-03-27T08:00:00",
+    "UsageType": {
+      "Title": "Public"
+    },
+    "GeneralComments": "Located in underground parking, height restriction 2.1m. 24/7 access with payment card."
+  },
+  {
+    "ID": 2,
+    "OperatorInfo": {
+      "Title": "ChargeFox",
+      "WebsiteURL": "https://chargefox.com.au"
+    },
+    "AddressInfo": {
+      "Title": "ChargeFox Melbourne Central",
+      "AddressLine1": "120 Collins Street",
+      "Town": "Melbourne",
+      "StateOrProvince": "VIC",
+      "Postcode": "3000",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -37.8142,
+      "Longitude": 144.9670
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 33,
+          "Title": "CCS (Type 2)"
+        },
+        "StatusType": {
+          "ID": 0,
+          "Title": "Available"
+        },
+        "PowerKW": 350.0,
+        "Cost": "$0.45 per kWh"
+      }
+    ],
+    "DateLastVerified": "2025-03-26T15:30:00",
+    "UsageType": {
+      "Title": "Public"
+    },
+    "GeneralComments": "Ultra-fast charging. Located in shopping center parking, access during mall hours only."
+  },
+  {
+    "ID": 3,
+    "OperatorInfo": {
+      "Title": "Tesla",
+      "WebsiteURL": "https://tesla.com"
+    },
+    "AddressInfo": {
+      "Title": "Tesla Supercharger - Brisbane",
+      "AddressLine1": "56 Queen Street",
+      "Town": "Brisbane",
+      "StateOrProvince": "QLD",
+      "Postcode": "4000",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -27.4698,
+      "Longitude": 153.0251
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 8,
+          "Title": "Tesla (Supercharger)"
+        },
+        "StatusType": {
+          "ID": 0,
+          "Title": "Available"
+        },
+        "PowerKW": 250.0,
+        "Cost": "$0.52 per kWh"
+      }
+    ],
+    "DateLastVerified": "2025-03-25T09:15:00",
+    "UsageType": {
+      "Title": "Public"
+    },
+    "GeneralComments": "Tesla Supercharger network, available for non-Tesla vehicles. Payment via Tesla app required for non-Tesla vehicles."
+  },
+  {
+    "ID": 4,
+    "OperatorInfo": {
+      "Title": "AmpCharge",
+      "WebsiteURL": "https://ampcharge.com.au"
+    },
+    "AddressInfo": {
+      "Title": "AmpCharge Perth",
+      "AddressLine1": "33 St Georges Terrace",
+      "Town": "Perth",
+      "StateOrProvince": "WA",
+      "Postcode": "6000",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -31.9546,
+      "Longitude": 115.8515
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 33,
+          "Title": "CCS (Type 2)"
+        },
+        "StatusType": {
+          "ID": 50,
+          "Title": "Operational"
+        },
+        "PowerKW": 75.0,
+        "Cost": "$0.38 per kWh"
+      },
+      {
+        "ConnectionType": {
+          "ID": 25,
+          "Title": "Type 2 (Socket Only)"
+        },
+        "StatusType": {
+          "ID": 50,
+          "Title": "Operational"
+        },
+        "PowerKW": 22.0,
+        "Cost": "$0.35 per kWh"
+      }
+    ],
+    "DateLastVerified": "2025-03-24T18:45:00",
+    "UsageType": {
+      "Title": "Public"
+    },
+    "GeneralComments": "Located near café with free WiFi while charging. Open 6am-10pm daily."
+  },
+  {
+    "ID": 5,
+    "OperatorInfo": {
+      "Title": "NRMA",
+      "WebsiteURL": "https://nrma.com.au"
+    },
+    "AddressInfo": {
+      "Title": "NRMA Adelaide",
+      "AddressLine1": "87 King William Street",
+      "Town": "Adelaide",
+      "StateOrProvince": "SA",
+      "Postcode": "5000",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -34.9258,
+      "Longitude": 138.6007
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 33,
+          "Title": "CCS (Type 2)"
+        },
+        "StatusType": {
+          "ID": 0,
+          "Title": "Available"
+        },
+        "PowerKW": 50.0,
+        "Cost": "Free for NRMA members, $0.45/kWh for non-members"
+      },
+      {
+        "ConnectionType": {
+          "ID": 25,
+          "Title": "Type 2 (Socket Only)"
+        },
+        "StatusType": {
+          "ID": 0,
+          "Title": "Available"
+        },
+        "PowerKW": 22.0,
+        "Cost": "Free for NRMA members, $0.40/kWh for non-members"
+      }
+    ],
+    "DateLastVerified": "2025-03-26T12:00:00",
+    "UsageType": {
+      "Title": "Public"
+    },
+    "GeneralComments": "NRMA members receive free charging. Non-members can use with payment card."
+  },
+  {
+    "ID": 6,
+    "OperatorInfo": {
+      "Title": "Jolt",
+      "WebsiteURL": "https://jolt.com.au"
+    },
+    "AddressInfo": {
+      "Title": "Jolt Canberra",
+      "AddressLine1": "15 London Circuit",
+      "Town": "Canberra",
+      "StateOrProvince": "ACT",
+      "Postcode": "2601",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -35.2809,
+      "Longitude": 149.1300
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 25,
+          "Title": "Type 2 (Socket Only)"
+        },
+        "StatusType": {
+          "ID": 10,
+          "Title": "Occupied"
+        },
+        "PowerKW": 25.0,
+        "Cost": "Free for first 7kWh daily, then $0.42/kWh"
+      }
+    ],
+    "DateLastVerified": "2025-03-27T10:30:00",
+    "UsageType": {
+      "Title": "Public"
+    },
+    "GeneralComments": "First 7kWh free per day with Jolt app, then standard rates apply. Popular station, may require waiting during peak hours."
+  },
+  {
+    "ID": 7,
+    "OperatorInfo": {
+      "Title": "Evie Networks",
+      "WebsiteURL": "https://evienetworks.com.au"
+    },
+    "AddressInfo": {
+      "Title": "Evie Networks Darwin",
+      "AddressLine1": "28 Mitchell Street",
+      "Town": "Darwin",
+      "StateOrProvince": "NT",
+      "Postcode": "0800",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -12.4634,
+      "Longitude": 130.8456
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 33,
+          "Title": "CCS (Type 2)"
+        },
+        "StatusType": {
+          "ID": 75,
+          "Title": "Offline"
+        },
+        "PowerKW": 50.0,
+        "Cost": "$0.40 per kWh"
+      }
+    ],
+    "DateLastVerified": "2025-03-20T14:20:00",
+    "UsageType": {
+      "Title": "Public"
+    },
+    "GeneralComments": "Temporarily offline for maintenance. Expected to be operational by April 2025."
+  },
+  {
+    "ID": 8,
+    "OperatorInfo": {
+      "Title": "ChargePod",
+      "WebsiteURL": "https://chargepod.com.au"
+    },
+    "AddressInfo": {
+      "Title": "ChargePod Hobart",
+      "AddressLine1": "45 Elizabeth Street",
+      "Town": "Hobart",
+      "StateOrProvince": "TAS",
+      "Postcode": "7000",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -42.8825,
+      "Longitude": 147.3281
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 25,
+          "Title": "Type 2 (Socket Only)"
+        },
+        "StatusType": {
+          "ID": 50,
+          "Title": "Operational"
+        },
+        "PowerKW": 11.0,
+        "Cost": "$0.30 per kWh"
+      }
+    ],
+    "DateLastVerified": "2025-03-22T08:15:00",
+    "UsageType": {
+      "Title": "Public"
+    },
+    "GeneralComments": "Level 2 AC charging available. Located in hotel parking, guests have priority but public access available."
+  },
+  {
+    "ID": 9,
+    "OperatorInfo": {
+      "Title": "Tesla",
+      "WebsiteURL": "https://tesla.com"
+    },
+    "AddressInfo": {
+      "Title": "Tesla Destination Charger - Gold Coast",
+      "AddressLine1": "94 Surf Parade",
+      "Town": "Gold Coast",
+      "StateOrProvince": "QLD",
+      "Postcode": "4217",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -28.0278,
+      "Longitude": 153.4303
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 10,
+          "Title": "Tesla (Destination Charger)"
+        },
+        "StatusType": {
+          "ID": 0,
+          "Title": "Available"
+        },
+        "PowerKW": 11.0,
+        "Cost": "Free for hotel guests, $10/hr for others"
+      }
+    ],
+    "DateLastVerified": "2025-03-25T16:00:00",
+    "UsageType": {
+      "Title": "Restricted Access"
+    },
+    "GeneralComments": "Located at beachfront hotel. Free for hotel guests, fee applies for non-guests. Open 24/7."
+  },
+  {
+    "ID": 10,
+    "OperatorInfo": {
+      "Title": "Everty",
+      "WebsiteURL": "https://everty.com.au"
+    },
+    "AddressInfo": {
+      "Title": "Everty Newcastle",
+      "AddressLine1": "67 Hunter Street",
+      "Town": "Newcastle",
+      "StateOrProvince": "NSW",
+      "Postcode": "2300",
+      "CountryID": 13,
+      "Country": {
+        "Title": "Australia"
+      },
+      "Latitude": -32.9272,
+      "Longitude": 151.7765
+    },
+    "Connections": [
+      {
+        "ConnectionType": {
+          "ID": 2,
+          "Title": "Type 2 (Mennekes)"
+        },
+        "StatusType": {
+          "ID": 0,
+          "Title": "Available"
+        },
+        "PowerKW": 7.4,
+        "Cost": "$0.25 per kWh + $2 connection fee"
+      }
+    ],
+    "DateLastVerified": "2025-03-24T11:30:00",
+    "UsageType": {
+      "Title": "Public"
+    },
+    "GeneralComments": "Recently installed 2024 station, reliable operation. Located in shopping center parking, access during mall hours only."
+  }
+]

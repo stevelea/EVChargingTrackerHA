@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bashio
+
+bashio::log.info "Starting EV Charging Tracker..."
+
+cd /app
+python run_proxy.py

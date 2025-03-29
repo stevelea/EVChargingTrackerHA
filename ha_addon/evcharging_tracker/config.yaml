@@ -1,0 +1,33 @@
+name: "EV Charging Tracker"
+description: "Track and visualize your EV charging data from providers like ChargePoint, Ampol, and others"
+version: "1.0.0"
+slug: "evcharging_tracker"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: application
+boot: auto
+ingress: true
+ingress_port: 5000
+panel_icon: "mdi:ev-station"
+panel_title: "EV Charging Tracker"
+ports:
+  5000/tcp: 5000
+ports_description:
+  5000/tcp: "Web interface (Not required for Home Assistant ingress)"
+hassio_api: true
+host_network: false
+map:
+  - "ssl"
+options:
+  use_guest_mode: true
+  guest_password: "evdata2023"
+  background_refresh_interval: 10
+schema:
+  use_guest_mode: bool
+  guest_password: str
+  background_refresh_interval: int

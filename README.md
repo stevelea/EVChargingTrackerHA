@@ -132,9 +132,32 @@ Check the `examples` directory for more comprehensive usage examples.
 
 ## Home Assistant Integration
 
-The application can be integrated with Home Assistant to provide sensor entities for monitoring your EV charging data.
+The application can be integrated with Home Assistant in multiple ways:
 
-### Local Network Setup
+### Option 1: Home Assistant Add-on (Recommended)
+
+The most seamless experience is to run EV Charging Tracker directly as a Home Assistant add-on:
+
+1. Download the `evcharging_tracker_addon.zip` file from the releases
+2. Extract the ZIP file
+3. Add the repository to your Home Assistant add-on store
+4. Install the "EV Charging Tracker" add-on
+5. Start the add-on and access it through Home Assistant
+
+For detailed instructions, see [HOME_ASSISTANT_ADDON_SETUP.md](HOME_ASSISTANT_ADDON_SETUP.md).
+
+Benefits of the add-on approach:
+- Single-click installation through Home Assistant
+- Appears in your Home Assistant dashboard
+- Automatic sensor entity creation
+- Persistent data storage managed by Home Assistant
+- No need to manage a separate Docker container or server
+
+### Option 2: Custom Component Integration (External Server)
+
+If you prefer to run the application on a separate server, you can use the custom component integration:
+
+#### Local Network Setup
 
 For deployments on a local network (Docker, self-hosted), use the standard Home Assistant integration:
 
@@ -148,7 +171,7 @@ For deployments on a local network (Docker, self-hosted), use the standard Home 
    - Port: 8000 (the API port)
    - API Key: The API key configured in your application
 
-### Replit Deployment Setup
+#### Replit Deployment Setup
 
 For Replit deployments, a special integration is provided due to Replit's unique routing constraints:
 
@@ -166,7 +189,7 @@ For Replit deployments, a special integration is provided due to Replit's unique
 
 ### Sensors Available
 
-The integration provides several useful sensors including:
+Both integration methods provide these sensors:
 
 - Total energy charged (kWh)
 - Total cost
@@ -175,6 +198,7 @@ The integration provides several useful sensors including:
 - Latest charging location
 - Latest charging cost
 - Latest peak power
+- Latest provider
 - And more...
 
 ## Troubleshooting
