@@ -1,4 +1,5 @@
 """API client for the EV Charging Tracker."""
+import asyncio
 import logging
 from typing import Dict, Any, Optional
 
@@ -22,27 +23,69 @@ class EVChargingTrackerApiClient:
 
     async def _request(self, endpoint: str, params: Optional[Dict] = None) -> Dict[str, Any]:
         """Make a request to the API."""
-        # Ensure endpoint is properly formatted with leading slash
-        if not endpoint.startswith('/'):
+        # Ensure params is a dictionary
+        params = params or {}
+        
+        # Fix URL formatting
+        # First, format the endpoint properly (handle different prefix styles)
+        if endpoint.startswith('/api/'):
+            # Already has the correct format
+            pass
+        elif endpoint.startswith('api/'):
             endpoint = '/' + endpoint
+        elif not endpoint.startswith('/'):
+            endpoint = '/api/' + endpoint
             
-        url = f"{self._base_url}{endpoint}"
+        # Format the base URL correctly (remove trailing slash if present)
+        base_url = self._base_url.rstrip('/')
+        
+        # Combine to form the complete URL
+        url = f"{base_url}{endpoint}"
+        
+        _LOGGER.debug("Making request to %s with headers: %s, params: %s", 
+                    url, self._headers, params)
         
         try:
-            # Log the request details for debugging
-            _LOGGER.debug("Making request to %s with headers: %s, params: %s", 
-                         url, self._headers, params)
-                         
-            async with self._session.get(url, headers=self._headers, params=params) as response:
-                response.raise_for_status()
-                result = await response.json()
-                _LOGGER.debug("API response: %s", result)
-                return result
+            # Set a reasonable timeout for the request (5 seconds)
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with self._session.get(
+                url, 
+                headers=self._headers, 
+                params=params,
+                timeout=timeout,
+                raise_for_status=False  # Don't raise for HTTP errors, handle manually
+            ) as response:
+                # Check status code
+                if response.status != 200:
+                    status_text = response.reason if hasattr(response, 'reason') else 'Unknown'
+                    body = await response.text()
+                    _LOGGER.error(
+                        "API request to %s failed with status %d (%s): %s", 
+                        url, response.status, status_text, body[:100]
+                    )
+                    return {}
+                
+                # Try to parse JSON response
+                try:
+                    result = await response.json()
+                    _LOGGER.debug("API response: %s", result)
+                    return result
+                except ValueError as json_error:
+                    text = await response.text()
+                    _LOGGER.error(
+                        "Failed to parse JSON from %s: %s. Raw response: %s", 
+                        url, json_error, text[:100]
+                    )
+                    return {}
+                    
+        except asyncio.TimeoutError:
+            _LOGGER.error("Request to %s timed out after 10 seconds", url)
+            return {}
         except aiohttp.ClientResponseError as error:
-            _LOGGER.error("Error fetching data from %s: %s", url, error)
+            _LOGGER.error("HTTP error from %s: %s", url, error)
             return {}
         except aiohttp.ClientError as error:
-            _LOGGER.error("Error connecting to %s: %s", url, error)
+            _LOGGER.error("Network error connecting to %s: %s", url, error)
             return {}
         except Exception as error:  # pylint: disable=broad-except
             _LOGGER.error("Unexpected error calling %s: %s", url, error)
@@ -50,7 +93,21 @@ class EVChargingTrackerApiClient:
 
     async def async_health_check(self) -> Dict[str, Any]:
         """Check if the API is running."""
-        return await self._request("api/health")
+        try:
+            # Log detailed debug info
+            _LOGGER.debug("Making health check request to %s/api/health", self._base_url)
+            result = await self._request("api/health")
+            _LOGGER.debug("Health check response: %s", result)
+            
+            # Return empty dict as fallback if result is None
+            if result is None:
+                _LOGGER.warning("Health check returned None")
+                return {}
+                
+            return result
+        except Exception as e:
+            _LOGGER.error("Health check error: %s", e)
+            return {}
 
     async def async_get_charging_data(
         self,

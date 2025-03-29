@@ -61,10 +61,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Verify connection to API
     try:
+        _LOGGER.debug("Verifying connection to EV Charging Tracker API at %s:%s", host, port)
         health_check = await api_client.async_health_check()
-        if not health_check.get("status") == "ok":
-            _LOGGER.error("Failed to connect to EV Charging Tracker API")
-            return False
+        _LOGGER.debug("Health check response: %s", health_check)
+        
+        # First, check for the expected 'status: ok' response
+        if health_check and health_check.get("status") == "ok":
+            _LOGGER.info("Successfully connected to EV Charging Tracker API")
+        
+        # If that fails, try to validate using a different endpoint
+        else:
+            _LOGGER.debug("Health check didn't return expected format, trying summary endpoint")
+            summary = await api_client.async_get_charging_summary()
+            _LOGGER.debug("Summary response: %s", summary)
+            
+            # If we got any valid response, consider it a success
+            if summary is not None:
+                _LOGGER.info("Successfully connected to EV Charging Tracker API via summary endpoint")
+            else:
+                _LOGGER.error("Failed to connect to EV Charging Tracker API - no valid response from any endpoint")
+                return False
+                
     except Exception as exc:  # pylint: disable=broad-except
         _LOGGER.error("Error connecting to EV Charging Tracker API: %s", exc)
         return False

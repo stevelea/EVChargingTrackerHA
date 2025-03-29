@@ -125,63 +125,151 @@ def create_visualizations(data):
     peak_kw_values = None
     if 'peak_kw' in data.columns:
         try:
-            # Start with default values
+            # Generate a list of default values first
             peak_kw_values = [5.0] * len(data)
+            print(f"Creating default peak_kw_values list with {len(peak_kw_values)} items")
             
-            # Handle different types that might be in the peak_kw column
-            peak_kw_series = data['peak_kw']
-            
-            # Check if it's a narwhals Series
-            if str(type(peak_kw_series)).find('narwhals.stable.v1.Series') >= 0:
-                # For narwhals Series, we need to explicitly convert each value
-                for i in range(len(data)):
-                    try:
-                        val = peak_kw_series.iloc[i] if hasattr(peak_kw_series, 'iloc') else None
-                        # Convert to float and handle None, NaN or 0
-                        if val is None or pd.isna(val) or float(val) <= 0:
-                            peak_kw_values[i] = 5.0
-                        else:
-                            peak_kw_values[i] = float(val)
-                    except (ValueError, TypeError, IndexError):
-                        # Keep default value for any conversion errors
-                        peak_kw_values[i] = 5.0
-            
-            # For pandas Series or other types with .values attribute
-            elif hasattr(peak_kw_series, 'values'):
-                # Extract values
-                raw_values = peak_kw_series.values
+            # Skip complex conversion if the data is empty
+            if len(data) == 0:
+                print("Data is empty, using default values")
+            else:
+                print(f"Converting peak_kw column of type: {type(data['peak_kw'])}")
                 
-                # Convert any numpy array to a standard Python list
-                if hasattr(raw_values, 'tolist'):
-                    raw_values = raw_values.tolist()
+                # Handle different types that might be in the peak_kw column
                 
-                # If we got a list with the correct length, process it
-                if isinstance(raw_values, list) and len(raw_values) == len(data):
-                    for i, val in enumerate(raw_values):
+                # Special handling for narwhals.stable.v1.Series
+                if "narwhals.stable.v1.Series" in str(type(data['peak_kw'])):
+                    print("Detected a narwhals Series, using item-by-item conversion")
+                    
+                    # For narwhals Series, we use a completely different approach that doesn't rely on built-in methods
+                    # We'll use a for loop with index access and explicit type conversion
+                    for i in range(len(data)):
                         try:
-                            # Convert to float and handle None, NaN or 0
-                            if val is None or pd.isna(val) or float(val) <= 0:
+                            # Use a more reliable way to extract individual values from Series
+                            if hasattr(data['peak_kw'], 'iloc'):
+                                val = data['peak_kw'].iloc[i]
+                            else:
+                                # Try direct index access as fallback
+                                val = data['peak_kw'][i]
+                                
+                            # Handle None and convert valid values to Python float
+                            if val is None or pd.isna(val) or val == 0:
                                 peak_kw_values[i] = 5.0
                             else:
-                                peak_kw_values[i] = float(val)
-                        except (ValueError, TypeError):
-                            # Keep default value for any conversion errors
+                                try:
+                                    float_val = float(val)
+                                    # Use default for negative or very small values
+                                    peak_kw_values[i] = float_val if float_val > 0.1 else 5.0
+                                except (ValueError, TypeError):
+                                    # Keep default for conversion errors
+                                    peak_kw_values[i] = 5.0
+                        except (IndexError, KeyError, AttributeError) as e:
+                            print(f"Error accessing peak_kw at index {i}: {str(e)}")
+                            # Keep default value
                             peak_kw_values[i] = 5.0
-            else:
-                # Fallback for any other type of object
-                print(f"peak_kw column of type {type(peak_kw_series)} doesn't have expected attributes. Using default values.")
                 
-            # Double-check that we have the correct number of values
-            if len(peak_kw_values) != len(data):
-                print(f"Peak kW values length mismatch: {len(peak_kw_values)} vs {len(data)}")
-                peak_kw_values = [5.0] * len(data)
+                # For pandas Series or other types with standard attributes
+                elif hasattr(data['peak_kw'], 'to_list'):
+                    print("Using pandas Series to_list() method")
+                    # This is a pandas Series with to_list method
+                    try:
+                        raw_values = data['peak_kw'].to_list()
+                        for i, val in enumerate(raw_values):
+                            if val is None or pd.isna(val) or val == 0:
+                                peak_kw_values[i] = 5.0
+                            else:
+                                try:
+                                    peak_kw_values[i] = float(val)
+                                except (ValueError, TypeError):
+                                    peak_kw_values[i] = 5.0
+                    except Exception as e:
+                        print(f"Error converting with to_list(): {str(e)}")
+                
+                # For numpy arrays or other objects with tolist method
+                elif hasattr(data['peak_kw'], 'tolist'):
+                    print("Using tolist() method")
+                    try:
+                        raw_values = data['peak_kw'].tolist()
+                        for i, val in enumerate(raw_values):
+                            if val is None or pd.isna(val) or val == 0:
+                                peak_kw_values[i] = 5.0
+                            else:
+                                try:
+                                    peak_kw_values[i] = float(val)
+                                except (ValueError, TypeError):
+                                    peak_kw_values[i] = 5.0
+                    except Exception as e:
+                        print(f"Error converting with tolist(): {str(e)}")
+                
+                # For standard objects that can be directly converted to list
+                elif hasattr(data['peak_kw'], '__iter__'):
+                    print("Using direct list conversion")
+                    try:
+                        raw_values = list(data['peak_kw'])
+                        for i, val in enumerate(raw_values):
+                            if val is None or pd.isna(val) or val == 0:
+                                peak_kw_values[i] = 5.0
+                            else:
+                                try:
+                                    peak_kw_values[i] = float(val)
+                                except (ValueError, TypeError):
+                                    peak_kw_values[i] = 5.0
+                    except Exception as e:
+                        print(f"Error converting with list(): {str(e)}")
+                
+                else:
+                    # Unable to convert with standard methods, use item-by-item conversion with for loop
+                    print("Fallback to manual item-by-item conversion")
+                    for i in range(len(data)):
+                        try:
+                            # Try to extract the value at this index
+                            val = None
+                            try:
+                                # Try different common access methods
+                                if hasattr(data['peak_kw'], 'iat'):
+                                    val = data['peak_kw'].iat[i]
+                                elif hasattr(data['peak_kw'], 'iloc'):
+                                    val = data['peak_kw'].iloc[i]
+                                elif hasattr(data['peak_kw'], '__getitem__'):
+                                    val = data['peak_kw'][i]
+                                else:
+                                    # Give up and use default
+                                    continue
+                                    
+                                # Convert the value to float
+                                if val is None or pd.isna(val) or val == 0:
+                                    peak_kw_values[i] = 5.0
+                                else:
+                                    try:
+                                        peak_kw_values[i] = float(val)
+                                    except (ValueError, TypeError):
+                                        peak_kw_values[i] = 5.0
+                            except Exception as e:
+                                print(f"Error accessing peak_kw at position {i}: {str(e)}")
+                        except Exception as e:
+                            print(f"Unexpected error at position {i}: {str(e)}")
             
-            # Final verification that all values are normal Python floats
-            peak_kw_values = [float(val) if val is not None and not pd.isna(val) else 5.0 for val in peak_kw_values]
+            # Final validation - ensure all values are Python floats and handle any remaining issue
+            print(f"Final validation of {len(peak_kw_values)} peak_kw values")
+            for i in range(len(peak_kw_values)):
+                try:
+                    # Make sure each value is a valid Python float
+                    peak_kw_values[i] = float(peak_kw_values[i]) if peak_kw_values[i] is not None else 5.0
+                    # Replace any invalid values (NaN, negative, etc)
+                    if pd.isna(peak_kw_values[i]) or peak_kw_values[i] <= 0:
+                        peak_kw_values[i] = 5.0
+                except Exception:
+                    # Final fallback
+                    peak_kw_values[i] = 5.0
                 
         except Exception as e:
-            print(f"Error converting peak_kw: {str(e)}")
-            # If conversion fails, create a list of fixed values
+            print(f"Error in peak_kw conversion: {str(e)}")
+            # If all conversion attempts fail, create a list of fixed values
+            peak_kw_values = [5.0] * len(data)
+        
+        # Final size check
+        if len(peak_kw_values) != len(data):
+            print(f"Final length mismatch: peak_kw_values ({len(peak_kw_values)}) vs data ({len(data)})")
             peak_kw_values = [5.0] * len(data)
     
     # Create scatter plot with or without variable size

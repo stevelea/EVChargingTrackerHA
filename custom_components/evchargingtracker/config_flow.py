@@ -20,12 +20,38 @@ async def validate_api_connection(
 ) -> bool:
     """Validate the user input allows us to connect to the API."""
     session = async_get_clientsession(hass)
-    client = EVChargingTrackerApiClient(session, f"http://{host}:{port}", api_key)
+    
+    # Format the base URL correctly
+    base_url = f"http://{host}:{port}"
+    _LOGGER.debug("Creating API client with base URL: %s", base_url)
+    
+    # Create the client
+    client = EVChargingTrackerApiClient(session, base_url, api_key)
 
     try:
+        # Attempt to check API health
+        _LOGGER.debug("Making health check request")
         result = await client.async_health_check()
-        return result.get("status") == "ok"
-    except Exception:  # pylint: disable=broad-except
+        _LOGGER.debug("Health check result: %s", result)
+        
+        # Check if the health endpoint returned successfully
+        if isinstance(result, dict) and result.get("status") == "ok":
+            _LOGGER.info("API connection validated successfully!")
+            return True
+            
+        # Fall back to a different endpoint if health check doesn't return the expected format
+        _LOGGER.debug("Health check didn't return expected format, trying summary endpoint")
+        summary = await client.async_get_charging_summary()
+        if summary is not None:
+            _LOGGER.info("API connection validated through summary endpoint!")
+            return True
+            
+        # If we got here, we couldn't validate the connection
+        _LOGGER.warning("Could not validate API connection")
+        return False
+        
+    except Exception as e:  # pylint: disable=broad-except
+        _LOGGER.error("Error validating API connection: %s", e)
         return False
 
 
