@@ -50,6 +50,10 @@ if 'charging_data' not in st.session_state:
     # We'll load data once the user is authenticated
     # This keeps data separate for each user
     
+    # Initialize authentication states
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+        
     # Initialize guest mode
     if 'guest_mode' not in st.session_state:
         st.session_state.guest_mode = False
@@ -124,8 +128,7 @@ if 'last_refresh' not in st.session_state:
     else:
         st.session_state.last_refresh = None
 
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
+# Authentication state already initialized above
 if 'gmail_client' not in st.session_state:
     st.session_state.gmail_client = GmailClient()
 if 'tesla_client' not in st.session_state:
@@ -179,32 +182,39 @@ with st.sidebar:
     if not st.session_state.authenticated and not st.session_state.guest_mode:
         st.info("Please authenticate to access the application.")
         
-        # Option to use the app in guest mode (read-only)
+        # Option to use the app in guest mode (read-only) with password
         st.markdown("### Quick Access")
+        guest_password = st.text_input("Guest Password", type="password")
         if st.button("🔍 Guest Mode (Read-only)"):
-            # Set up guest mode
-            st.session_state.guest_mode = True
-            st.session_state.current_user_email = "stevelea@gmail.com"
-            
-            # Create sample data for the guest user
-            try:
-                # Load data from stevelea@gmail.com account
-                existing_data = load_charging_data(st.session_state.current_user_email)
-                if existing_data:
-                    # Process the existing data
-                    df = clean_charging_data(existing_data)
-                    st.session_state.charging_data = df
-                else:
-                    # Fall back to sample data if no real data is available
-                    create_test_data.create_sample_charging_data()
-                    test_data = load_charging_data("test@example.com")
-                    st.session_state.charging_data = clean_charging_data(test_data)
+            # Very simple password protection
+            if guest_password == "evdata2023":
+                # Set up guest mode
+                st.session_state.guest_mode = True
+                st.session_state.authenticated = True  # This is needed to display data
+                st.session_state.current_user_email = "stevelea@gmail.com"
                 
-                st.success("Guest mode activated. You can now view the data in read-only mode.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error loading guest data: {str(e)}")
-                st.session_state.guest_mode = False
+                # Create sample data for the guest user
+                try:
+                    # Load data from stevelea@gmail.com account
+                    existing_data = load_charging_data(st.session_state.current_user_email)
+                    if existing_data:
+                        # Process the existing data
+                        df = clean_charging_data(existing_data)
+                        st.session_state.charging_data = df
+                    else:
+                        # Fall back to sample data if no real data is available
+                        create_test_data.create_sample_charging_data("stevelea@gmail.com", 40)
+                        existing_data = load_charging_data("stevelea@gmail.com")
+                        st.session_state.charging_data = clean_charging_data(existing_data)
+                    
+                    st.success("Guest mode activated. You can now view the data in read-only mode.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error loading guest data: {str(e)}")
+                    st.session_state.guest_mode = False
+                    st.session_state.authenticated = False
+            else:
+                st.error("Incorrect guest password. Please try again.")
         
         st.markdown("### Gmail Authentication")
         st.info("Or authenticate with your Gmail account to access your own charging receipts.")
@@ -291,6 +301,7 @@ with st.sidebar:
             st.success("Guest Mode (Read-only)")
             if st.button("Exit Guest Mode"):
                 st.session_state.guest_mode = False
+                st.session_state.authenticated = False  # Also reset authenticated flag
                 st.session_state.charging_data = None
                 st.session_state.current_user_email = None
                 st.rerun()
@@ -1530,7 +1541,7 @@ with st.sidebar:
                 st.rerun()
 
 # Main content area
-if st.session_state.authenticated:
+if st.session_state.authenticated or st.session_state.guest_mode:
     # Auto-fetch data when the user first logs in
     if 'auto_fetch_data' in st.session_state and st.session_state.auto_fetch_data:
         st.info("Automatically fetching your charging data...")
@@ -2015,7 +2026,7 @@ if st.session_state.authenticated:
     else:
         st.info("No charging data available. Use the sidebar controls to fetch data from Gmail.")
 else:
-    st.info("Please authenticate with Gmail using the sidebar controls to get started.")
+    st.info("Please authenticate with Gmail or use Guest Mode from the sidebar controls to get started.")
 
 # Footer
 st.markdown("---")
