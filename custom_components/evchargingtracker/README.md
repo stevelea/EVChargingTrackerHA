@@ -5,8 +5,15 @@ This custom integration allows you to integrate your EV Charging Tracker data in
 ## Prerequisites
 
 - Home Assistant instance (Core, OS, Container, or Supervised)
-- EV Charging Tracker application running with the API server enabled (running on port 8000)
+- EV Charging Tracker application running with the API server enabled
 - Network access from Home Assistant to the EV Charging Tracker application
+
+## Important Update: Port Configuration 
+
+The EV Charging Tracker now uses a proxy-based solution that serves both the UI and API on port 5000.
+
+- For locally hosted instances: Use port 5000 (not 8000 or 8505)
+- For Replit-hosted instances: Always use port 5000
 
 ## Installation
 
@@ -32,9 +39,9 @@ This custom integration allows you to integrate your EV Charging Tracker data in
 3. Click the **+ ADD INTEGRATION** button.
 4. Search for "EV Charging Tracker" and select it.
 5. Enter the following information:
-   - **Host**: The hostname or IP address of your EV Charging Tracker server (e.g., `localhost` or `192.168.1.10`)
-   - **Port**: The port of the API server (default is `8000`)
-   - **API Key**: (Optional) If your API requires an API key
+   - **Host**: The hostname or IP address of your EV Charging Tracker server (e.g., `localhost` or `192.168.1.10` or `ev-charging-tracker-stevelea1.replit.app`)
+   - **Port**: The port of the API server (always use `5000` for both local and Replit deployments)
+   - **API Key**: (Optional) The default API key is `ev-charging-api-key`
 
 6. Click **Submit** to add the integration.
 
@@ -62,9 +69,11 @@ After setup, the following sensor entities will be available in Home Assistant:
 If you encounter issues:
 
 1. Check that the EV Charging Tracker API server is running and accessible.
-2. Verify the API server is running on the expected port (default 8000).
-3. Check the Home Assistant logs for error messages related to the integration.
-4. Make sure your network allows connections from Home Assistant to the EV Charging Tracker server.
+2. Verify the API server is running on port 5000 (not 8000 or 8505).
+3. For Replit-hosted instances, make sure to use the format `ev-charging-tracker-stevelea1.replit.app` (without http/https) and port 5000.
+4. Check the Home Assistant logs for error messages related to the integration.
+5. Make sure your network allows connections from Home Assistant to the EV Charging Tracker server.
+6. Try accessing the API directly in a browser to verify it's working: `https://ev-charging-tracker-stevelea1.replit.app/api/health`
 
 ## Support
 

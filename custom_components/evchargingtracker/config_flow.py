@@ -123,11 +123,11 @@ class EVChargingTrackerConfigFlow(config_entries.ConfigFlow, domain="evchargingt
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
 
-        # Show form
+        # Show form with updated defaults for port and API key
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_HOST, default="localhost"): str,
-                vol.Required(CONF_PORT, default=5000): int,
+                vol.Required(CONF_HOST, default="ev-charging-tracker-stevelea1.replit.app"): str,
+                vol.Required(CONF_PORT, default=5000): int,  # Always use port 5000 for Replit
                 vol.Optional(CONF_API_KEY, default="ev-charging-api-key"): str,
             }
         )

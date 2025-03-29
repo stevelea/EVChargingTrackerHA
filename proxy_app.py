@@ -404,15 +404,52 @@ def proxy_streamlit(path):
         if path == 'api/charging-data':
             return get_charging_data()
             
+        # For specific charging record
+        if path.startswith('api/charging-data/') and len(path.split('/')) >= 3:
+            record_id = path.split('/')[2]
+            return get_charging_record(record_id)
+            
         # For API summary endpoint
         if path == 'api/summary':
             return get_charging_summary()
+            
+        # For API users endpoint
+        if path == 'api/users':
+            return get_users()
+            
+        # Background API endpoints if available
+        if BACKGROUND_AVAILABLE:
+            # Background status
+            if path == 'api/background/status':
+                return background_status()
+                
+            # Background start
+            if path == 'api/background/start':
+                return background_start()
+                
+            # Background stop
+            if path == 'api/background/stop':
+                return background_stop()
+                
+            # Background refresh
+            if path == 'api/background/refresh':
+                return background_refresh()
             
         # For unknown API endpoints
         return jsonify({
             "status": "error", 
             "message": f"Unknown API endpoint: {path}",
-            "available_endpoints": ["/api/health", "/api/charging-data", "/api/summary"]
+            "available_endpoints": [
+                "/api/health", 
+                "/api/charging-data", 
+                "/api/charging-data/{id}",
+                "/api/summary",
+                "/api/users",
+                "/api/background/status",
+                "/api/background/start",
+                "/api/background/stop",
+                "/api/background/refresh"
+            ]
         }), 404
     
     # Quick check for health endpoint

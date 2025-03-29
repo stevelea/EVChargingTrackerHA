@@ -151,9 +151,9 @@ class EVChargingTrackerApiClient:
                 # Extract clean domain
                 clean_domain = self._base_url.replace('http://', '').replace('https://', '').split(':')[0]
                 
-                # Try the simplest possible approach first
+                # Try the new proxy-based direct route first
                 direct_url = f"https://{clean_domain}/api/health"
-                _LOGGER.info("Trying direct health check with: %s", direct_url)
+                _LOGGER.info("Trying direct health check with proxy URL format: %s", direct_url)
                 
                 try:
                     timeout = aiohttp.ClientTimeout(total=10)
