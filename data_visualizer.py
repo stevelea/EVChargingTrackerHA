@@ -128,10 +128,28 @@ def create_visualizations(data):
             # Start with default values
             peak_kw_values = [5.0] * len(data)
             
-            # Explicitly extract values from the dataframe as Python floats
-            if hasattr(data['peak_kw'], 'values'):
-                # For pandas Series or DataFrame
-                raw_values = data['peak_kw'].values
+            # Handle different types that might be in the peak_kw column
+            peak_kw_series = data['peak_kw']
+            
+            # Check if it's a narwhals Series
+            if str(type(peak_kw_series)).find('narwhals.stable.v1.Series') >= 0:
+                # For narwhals Series, we need to explicitly convert each value
+                for i in range(len(data)):
+                    try:
+                        val = peak_kw_series.iloc[i] if hasattr(peak_kw_series, 'iloc') else None
+                        # Convert to float and handle None, NaN or 0
+                        if val is None or pd.isna(val) or float(val) <= 0:
+                            peak_kw_values[i] = 5.0
+                        else:
+                            peak_kw_values[i] = float(val)
+                    except (ValueError, TypeError, IndexError):
+                        # Keep default value for any conversion errors
+                        peak_kw_values[i] = 5.0
+            
+            # For pandas Series or other types with .values attribute
+            elif hasattr(peak_kw_series, 'values'):
+                # Extract values
+                raw_values = peak_kw_series.values
                 
                 # Convert any numpy array to a standard Python list
                 if hasattr(raw_values, 'tolist'):
@@ -151,7 +169,7 @@ def create_visualizations(data):
                             peak_kw_values[i] = 5.0
             else:
                 # Fallback for any other type of object
-                print("peak_kw column doesn't have expected .values attribute")
+                print(f"peak_kw column of type {type(peak_kw_series)} doesn't have expected attributes. Using default values.")
                 
             # Double-check that we have the correct number of values
             if len(peak_kw_values) != len(data):

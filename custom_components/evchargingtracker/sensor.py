@@ -220,10 +220,46 @@ class EVChargingTrackerSensor(CoordinatorEntity, SensorEntity):
 
     def _update_from_record(self, record: Dict[str, Any]) -> None:
         """Update entity from record data."""
-        if self.entity_description.value_fn and self.entity_description.source_key:
-            self._attr_native_value = self.entity_description.value_fn(record)
-        elif self.entity_description.source_key:
-            self._attr_native_value = record.get(self.entity_description.source_key)
+        try:
+            if not record:
+                _LOGGER.warning("Empty record data received for %s", self.entity_id)
+                return
+                
+            if self.entity_description.value_fn and self.entity_description.source_key:
+                self._attr_native_value = self.entity_description.value_fn(record)
+            elif self.entity_description.source_key:
+                self._attr_native_value = record.get(self.entity_description.source_key)
+                
+            # Make sure we don't have unsupported types
+            if self._attr_native_value is not None:
+                if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP:
+                    # We need a proper datetime object for timestamps
+                    if not isinstance(self._attr_native_value, datetime):
+                        _LOGGER.warning(
+                            "Timestamp sensor %s has non-datetime value: %s (%s)", 
+                            self.entity_id, 
+                            self._attr_native_value,
+                            type(self._attr_native_value)
+                        )
+                        self._attr_native_value = None
+                elif (
+                    self.entity_description.device_class in 
+                    (SensorDeviceClass.ENERGY, SensorDeviceClass.POWER, SensorDeviceClass.MONETARY)
+                ):
+                    # Numeric sensors need float values
+                    try:
+                        self._attr_native_value = float(self._attr_native_value)
+                    except (ValueError, TypeError):
+                        _LOGGER.warning(
+                            "Numeric sensor %s has non-numeric value: %s (%s)", 
+                            self.entity_id, 
+                            self._attr_native_value,
+                            type(self._attr_native_value)
+                        )
+                        self._attr_native_value = 0.0
+        except Exception as e:
+            _LOGGER.error("Error updating sensor %s: %s", self.entity_id, e)
+            # Don't reset the value - keep the previous one instead
 
     def _update_attributes(self) -> None:
         """Update attributes from coordinator data."""

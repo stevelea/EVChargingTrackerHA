@@ -114,33 +114,45 @@ class EVChargingTrackerDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from EV Charging Tracker API."""
         try:
-            # Get summary
-            summary_result = await self.api_client.async_get_charging_summary()
-            if not summary_result:
-                raise UpdateFailed("Failed to fetch summary data")
+            # Initialize defaults
+            summary_result = {}
+            latest_record = {}
+            
+            # Get summary data
+            try:
+                summary_result = await self.api_client.async_get_charging_summary()
+                _LOGGER.debug("Summary result: %s", summary_result)
+            except Exception as e:
+                _LOGGER.error("Error getting charging summary: %s", e)
+                # Don't raise an exception here; we'll try to get the charging data instead
             
             # Get charging data for latest record
-            charging_data_result = await self.api_client.async_get_charging_data()
-            if not charging_data_result:
-                raise UpdateFailed("Failed to fetch charging data")
-            
-            # Extract records from response - handle different response formats
-            records = charging_data_result.get("data", []) if isinstance(charging_data_result, dict) else []
-            
-            # Find latest record
-            latest_record = {}
-            if isinstance(records, list) and records:
-                try:
-                    # Sort by date if available to get latest record
-                    sorted_data = sorted(
-                        records,
-                        key=lambda x: x.get("date", ""),
-                        reverse=True
-                    )
-                    latest_record = sorted_data[0]
-                except (KeyError, IndexError, TypeError):
-                    if records:
-                        latest_record = records[0]
+            try:
+                charging_data_result = await self.api_client.async_get_charging_data()
+                _LOGGER.debug("Charging data result: %s", charging_data_result)
+                
+                # Extract records from response - handle different response formats
+                records = []
+                if isinstance(charging_data_result, dict):
+                    records = charging_data_result.get("data", [])
+                
+                # Find latest record
+                if isinstance(records, list) and records:
+                    try:
+                        # Sort by date if available to get latest record
+                        sorted_data = sorted(
+                            records,
+                            key=lambda x: x.get("date", ""),
+                            reverse=True
+                        )
+                        latest_record = sorted_data[0]
+                    except (KeyError, IndexError, TypeError) as e:
+                        _LOGGER.warning("Error sorting records: %s. Using first record instead.", e)
+                        if records:
+                            latest_record = records[0]
+            except Exception as e:
+                _LOGGER.error("Error getting charging data: %s", e)
+                # Don't raise an exception here; we'll continue with what we have
             
             # Update and return data
             self.api_data = {

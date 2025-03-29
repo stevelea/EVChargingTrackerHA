@@ -17,16 +17,27 @@ class EVChargingTrackerApiClient:
         self._session = session
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
-        self._headers = {"X-API-KEY": api_key} if api_key else {}
+        # Use X-API-Key header (note the capitalization) to match the Flask API's expected format
+        self._headers = {"X-API-Key": api_key} if api_key else {}
 
     async def _request(self, endpoint: str, params: Optional[Dict] = None) -> Dict[str, Any]:
         """Make a request to the API."""
-        url = f"{self._base_url}/{endpoint.lstrip('/')}"
+        # Ensure endpoint is properly formatted with leading slash
+        if not endpoint.startswith('/'):
+            endpoint = '/' + endpoint
+            
+        url = f"{self._base_url}{endpoint}"
         
         try:
+            # Log the request details for debugging
+            _LOGGER.debug("Making request to %s with headers: %s, params: %s", 
+                         url, self._headers, params)
+                         
             async with self._session.get(url, headers=self._headers, params=params) as response:
                 response.raise_for_status()
-                return await response.json()
+                result = await response.json()
+                _LOGGER.debug("API response: %s", result)
+                return result
         except aiohttp.ClientResponseError as error:
             _LOGGER.error("Error fetching data from %s: %s", url, error)
             return {}
@@ -62,7 +73,19 @@ class EVChargingTrackerApiClient:
         if location:
             params["location"] = location
 
-        return await self._request("api/charging-data", params)
+        result = await self._request("api/charging-data", params)
+        
+        # Handle different response formats - sometimes the API returns a direct list of records
+        # instead of wrapping them in a 'data' field
+        if isinstance(result, list):
+            return {"data": result}
+        
+        # If it's an empty dict (error case handled in _request), wrap in expected format
+        if not result:
+            return {"data": []}
+            
+        # Return the result as-is if it's already in the expected format
+        return result
 
     async def async_get_charging_record(
         self, record_id: str, email: Optional[str] = None
@@ -82,4 +105,15 @@ class EVChargingTrackerApiClient:
         if email:
             params["email"] = email
 
-        return await self._request("api/summary", params)
+        result = await self._request("api/summary", params)
+        
+        # If no results or an error occurred, return an empty summary
+        if not result:
+            return {
+                "total_energy_kwh": 0.0,
+                "total_cost": 0.0,
+                "avg_cost_per_kwh": 0.0,
+                "record_count": 0
+            }
+            
+        return result
