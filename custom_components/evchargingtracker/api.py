@@ -41,10 +41,14 @@ class EVChargingTrackerApiClient:
         # Ensure params is a dictionary
         params = params or {}
         
-        # Fix URL formatting
-        # First, format the endpoint properly (handle different prefix styles)
-        # Allow endpoints to be specified with either api/, /api/, or no prefix
-        # We'll normalize to always have /api/ as the format in the final URL
+        # Format the base URL correctly (remove trailing slash if present)
+        base_url = self._base_url.rstrip('/')
+        
+        # Special handling for Replit URLs
+        is_replit_url = '.replit.app' in base_url
+        
+        # Normalize the endpoint path
+        # For Replit URLs, our API routes all have '/api/' prefix
         
         # Check if endpoint already includes /api/ in some format
         has_api_prefix = False
@@ -60,9 +64,10 @@ class EVChargingTrackerApiClient:
             # If endpoint already has a leading slash but not the API prefix, add the prefix
             if not endpoint.startswith('/api/'):
                 endpoint = '/api' + endpoint
-            
-        # Format the base URL correctly (remove trailing slash if present)
-        base_url = self._base_url.rstrip('/')
+        
+        # Log the final endpoint format
+        _LOGGER.debug("Using endpoint format: %s for %s URL", 
+                      endpoint, "Replit" if is_replit_url else "standard")
         
         # Special handling for Replit URLs - ensure HTTPS but DO NOT add port
         if '.replit.app' in base_url:

@@ -63,15 +63,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if ':' in clean_host:
             clean_host = clean_host.split(':')[0]  # Remove any port numbers
             
-        # Now rebuild with proper HTTPS protocol
+        # Now rebuild with proper HTTPS protocol WITHOUT port specification
+        # CRITICAL CHANGE: Do NOT add port to Replit URLs
         base_url = f"https://{clean_host}"
         
-        # Force use of port 8000 for Replit deployments, since that's where our API runs
-        # Don't add port if it's going to be used as part of the subdomain pattern 
-        # (some Replit deployments use subdomains instead of ports)
-        base_url = f"{base_url}:8000"
-        
-        _LOGGER.info("Using Replit URL configuration: %s", base_url)
+        _LOGGER.info("Using Replit URL configuration (no port specification): %s", base_url)
     else:
         # For standard host:port combinations
         base_url = f"http://{host}:{port}"
