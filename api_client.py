@@ -180,7 +180,7 @@ class EVChargingAPIClient:
 if __name__ == "__main__":
     # Create a client instance
     client = EVChargingAPIClient(
-        base_url="http://localhost:5001",
+        base_url="http://localhost:8000",
         api_key="ev-charging-api-key"  # Default API key
     )
     

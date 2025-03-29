@@ -6,7 +6,7 @@ This API provides access to electric vehicle charging data stored in the EV Char
 
 The API is available at:
 ```
-http://localhost:5001
+http://localhost:8000
 ```
 
 For deployed applications, the base URL will be the host where the API is running.
@@ -204,7 +204,7 @@ from api_client import EVChargingAPIClient
 
 # Create client
 client = EVChargingAPIClient(
-    base_url="http://localhost:5001",
+    base_url="http://localhost:8000",
     api_key="your-api-key"
 )
 

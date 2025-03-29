@@ -165,7 +165,7 @@ def parse_args():
         "--host", default="localhost", help="Hostname or IP address of the API server"
     )
     parser.add_argument(
-        "--port", type=int, default=5001, help="Port of the API server"
+        "--port", type=int, default=8000, help="Port of the API server"
     )
     parser.add_argument(
         "--api-key", help="API key for authentication (if required)"

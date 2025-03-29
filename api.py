@@ -20,7 +20,20 @@ try:
 except ImportError:
     BACKGROUND_AVAILABLE = False
 
+# Check if this is running in Replit environment
+in_replit = os.environ.get('REPL_ID') is not None
+
+# Create Flask app
 app = Flask(__name__)
+
+# Set URL prefix for all routes based on environment
+if in_replit:
+    # In Replit, we need to use a URL prefix to avoid conflicts with Streamlit
+    # Both applications will run on port 5000, but API will be under /api prefix
+    URL_PREFIX = '/api'
+else:
+    # No prefix needed for non-Replit environments
+    URL_PREFIX = ''
 
 # API key variable (for simple authentication)
 API_KEY = os.environ.get('API_KEY', 'ev-charging-api-key')
@@ -55,8 +68,10 @@ def parse_date_param(date_str):
     except Exception:
         return None
 
+# URL_PREFIX is already defined above
+
 # Routes
-@app.route('/api/health', methods=['GET'])
+@app.route(f'{URL_PREFIX}/health', methods=['GET'])
 def health_check():
     """Health check endpoint that doesn't require authentication"""
     return jsonify({
@@ -64,7 +79,7 @@ def health_check():
         'timestamp': datetime.now().isoformat()
     })
 
-@app.route('/api/charging-data', methods=['GET'])
+@app.route(f'{URL_PREFIX}/charging-data', methods=['GET'])
 def get_charging_data():
     """Get charging data, optionally filtered by parameters"""
     # Validate API key
@@ -109,7 +124,7 @@ def get_charging_data():
         'data': charging_data
     })
 
-@app.route('/api/charging-data/<record_id>', methods=['GET'])
+@app.route(f'{URL_PREFIX}/charging-data/<record_id>', methods=['GET'])
 def get_charging_record(record_id):
     """Get a specific charging record by ID"""
     # Validate API key
@@ -130,7 +145,7 @@ def get_charging_record(record_id):
     # If no matching record is found
     abort(404, description=f"Charging record with ID {record_id} not found")
 
-@app.route('/api/summary', methods=['GET'])
+@app.route(f'{URL_PREFIX}/summary', methods=['GET'])
 def get_charging_summary():
     """Get a summary of charging data statistics"""
     # Validate API key
@@ -194,7 +209,7 @@ def get_charging_summary():
     
     return jsonify(summary)
 
-@app.route('/api/users', methods=['GET'])
+@app.route(f'{URL_PREFIX}/users', methods=['GET'])
 def get_users():
     """Get list of users with data in the system"""
     # Validate API key
@@ -278,7 +293,7 @@ def server_error(error):
 
 # Background task management endpoints
 if BACKGROUND_AVAILABLE:
-    @app.route('/api/background/status', methods=['GET'])
+    @app.route(f'{URL_PREFIX}/background/status', methods=['GET'])
     def background_status():
         """Get the status of the background refresh task"""
         # Validate API key
@@ -288,7 +303,7 @@ if BACKGROUND_AVAILABLE:
         status = background.get_background_status()
         return jsonify(status)
     
-    @app.route('/api/background/start', methods=['POST'])
+    @app.route(f'{URL_PREFIX}/background/start', methods=['POST'])
     def background_start():
         """Start the background refresh task"""
         # Validate API key
@@ -310,7 +325,7 @@ if BACKGROUND_AVAILABLE:
             'interval_minutes': interval
         })
     
-    @app.route('/api/background/stop', methods=['POST'])
+    @app.route(f'{URL_PREFIX}/background/stop', methods=['POST'])
     def background_stop():
         """Stop the background refresh task"""
         # Validate API key
@@ -325,7 +340,7 @@ if BACKGROUND_AVAILABLE:
             'message': 'Background refresh task stopped' if success else 'No task was running'
         })
     
-    @app.route('/api/background/refresh', methods=['POST'])
+    @app.route(f'{URL_PREFIX}/background/refresh', methods=['POST'])
     def background_refresh():
         """Perform a one-time refresh of the data"""
         # Validate API key
@@ -362,8 +377,20 @@ if BACKGROUND_AVAILABLE:
 # Main entry point
 if __name__ == '__main__':
     
-    # Set default port to 5001 to avoid conflict with Streamlit
-    port = int(os.environ.get('API_PORT', 5001))
+    # Check if an explicit port is requested via environment variable
+    api_port_env = os.environ.get('API_PORT')
+    if api_port_env:
+        port = int(api_port_env)
+        print(f"Using port {port} from API_PORT environment variable for API server")
+    # Otherwise, follow the Replit vs non-Replit logic
+    elif in_replit:
+        # In Replit, we normally use port 5000 as it's the only forwarded port
+        port = 5000
+        print("Running in Replit environment, using port 5000 for API")
+    else:
+        # Outside Replit (local dev), use port 5001 to avoid conflict with Streamlit
+        port = 5001
+        print(f"Running outside Replit, using port {port} for API")
     
     # Set host to make it accessible from outside
     host = os.environ.get('API_HOST', '0.0.0.0')

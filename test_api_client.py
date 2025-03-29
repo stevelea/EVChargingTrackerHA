@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 def main():
     parser = argparse.ArgumentParser(description='Test the EV Charging API client')
-    parser.add_argument('--base-url', default='http://localhost:5001', help='Base URL of the API server')
+    parser.add_argument('--base-url', default='http://localhost:8000', help='Base URL of the API server')
     parser.add_argument('--api-key', default='ev-charging-api-key', help='API key for authentication')
     parser.add_argument('--email', help='Email address to filter data by user')
     parser.add_argument('--days', type=int, default=30, help='Number of days to look back for date filtering')

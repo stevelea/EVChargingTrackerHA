@@ -62,7 +62,7 @@ After setup, the following sensor entities will be available in Home Assistant:
 If you encounter issues:
 
 1. Check that the EV Charging Tracker API server is running and accessible.
-2. Verify the API server is running on the expected port (default 5001).
+2. Verify the API server is running on the expected port (default 8000).
 3. Check the Home Assistant logs for error messages related to the integration.
 4. Make sure your network allows connections from Home Assistant to the EV Charging Tracker server.
 

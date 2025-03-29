@@ -10,7 +10,7 @@ import traceback
 from gmail_api import GmailClient
 from data_parser import parse_charging_emails
 from data_storage import load_charging_data, save_charging_data, merge_charging_data
-from utils import load_credentials
+import utils
 
 # Global variables to track background task state
 _background_thread = None
@@ -37,7 +37,7 @@ def refresh_data(email_address=None, password=None, search_terms=None):
     try:
         # If email or password not provided, try to load from credentials
         if not email_address or not password:
-            credentials = load_credentials()
+            credentials = utils.load_credentials()
             if credentials and 'email_address' in credentials:
                 email_address = credentials['email_address']
                 
@@ -133,7 +133,7 @@ def background_refresh_task(interval_minutes=10):
         while not _stop_background:
             try:
                 # Load credentials
-                credentials = load_credentials()
+                credentials = utils.load_credentials()
                 if credentials and 'email_address' in credentials and 'password' in credentials:
                     # Perform refresh
                     print(f"Background refresh at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

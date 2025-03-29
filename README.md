@@ -93,7 +93,7 @@ To update the application to a newer version:
 
 ## API Access
 
-The application includes a REST API for accessing charging data from external applications. The API runs on port 5001 by default.
+The application includes a REST API for accessing charging data from external applications. The API runs on port 8000 by default.
 
 ### API Documentation
 
@@ -114,7 +114,7 @@ from api_client import EVChargingAPIClient
 
 # Create client
 client = EVChargingAPIClient(
-    base_url="http://localhost:5001",
+    base_url="http://localhost:8000",
     api_key="ev-charging-api-key"
 )
 
