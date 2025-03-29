@@ -35,10 +35,18 @@ async def validate_api_connection(
             clean_host = clean_host.split(':')[0]
             _LOGGER.info("Extracted clean hostname from Replit URL: %s", clean_host)
         
-        # CRITICAL CHANGE: For Replit, DO NOT add port to the URL - use the /api base path instead
-        # This is because Replit only exposes port 443 publicly
+        # CRITICAL CHANGE: For Replit, always use HTTPS without port
+        # Replit only exposes port 443 publicly
         base_url = f"https://{clean_host}"
         _LOGGER.info("Using Replit URL format without port (public HTTPS): %s", base_url)
+        
+        # Log a warning message for the user
+        _LOGGER.warning(
+            "Connecting to a Replit-hosted EV Charging Tracker. "
+            "IMPORTANT: Make sure you've updated to the latest integration files that "
+            "support the Replit URL format. You must use the exact hostname %s with no port.", 
+            clean_host
+        )
     else:
         # For standard host:port combinations
         base_url = f"http://{host}:{port}"
@@ -119,7 +127,7 @@ class EVChargingTrackerConfigFlow(config_entries.ConfigFlow, domain="evchargingt
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_HOST, default="localhost"): str,
-                vol.Required(CONF_PORT, default=8505): int,
+                vol.Required(CONF_PORT, default=5000): int,
                 vol.Optional(CONF_API_KEY, default="ev-charging-api-key"): str,
             }
         )

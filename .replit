@@ -49,7 +49,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "ENABLE_TEST_DATA=true python run_combined.py"
+args = "ENABLE_TEST_DATA=true python run_proxy.py"
 waitForPort = 5000
 
 [[ports]]
@@ -67,3 +67,4 @@ externalPort = 8000
 [[ports]]
 localPort = 8505
 externalPort = 3001
+exposeLocalhost = true
