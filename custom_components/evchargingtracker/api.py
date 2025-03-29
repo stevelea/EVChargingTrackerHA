@@ -46,8 +46,11 @@ class EVChargingTrackerApiClient:
                 base_url = f"https://{base_url}"
                 
             # Add port 8000 if not already included and if it's not using a standard HTTPS port
-            if ':8000' not in base_url and ':443' not in base_url:
+            # Only add port if not already present in the URL (check for any port specification)
+            if not any(f":{port}" in base_url for port in ['443', '8000', '5000']):
                 base_url = f"{base_url}:8000"
+                
+            _LOGGER.debug("Adjusted Replit URL to: %s", base_url)
         
         # Combine to form the complete URL
         url = f"{base_url}{endpoint}"
@@ -105,17 +108,47 @@ class EVChargingTrackerApiClient:
     async def async_health_check(self) -> Dict[str, Any]:
         """Check if the API is running."""
         try:
-            # Log detailed debug info
-            _LOGGER.debug("Making health check request to %s/api/health", self._base_url)
+            # Try the 'health' endpoint first
+            _LOGGER.debug("Making health check request to health endpoint")
             result = await self._request("api/health")
             _LOGGER.debug("Health check response: %s", result)
             
-            # Return empty dict as fallback if result is None
-            if result is None:
-                _LOGGER.warning("Health check returned None")
-                return {}
+            # Return result if valid
+            if result and isinstance(result, dict) and "status" in result:
+                return result
+            
+            # Try alternate paths if the first fails
+            _LOGGER.debug("Health check not successful, trying alternate path")
+            alt_result = await self._request("health")
+            
+            if alt_result and isinstance(alt_result, dict) and "status" in alt_result:
+                _LOGGER.debug("Alternate health path successful")
+                return alt_result
+            
+            # If we get here, try one more approach with just /health
+            if '.replit.app' in self._base_url:
+                # For Replit URLs, try with just the base domain and /health path
+                base_domain = self._base_url.split(':')[0]  # Remove any port
+                full_url = f"{base_domain}/health"
+                _LOGGER.debug("Trying direct URL: %s", full_url)
                 
-            return result
+                # Make a direct request outside of the usual helper
+                timeout = aiohttp.ClientTimeout(total=10)
+                try:
+                    async with self._session.get(
+                        full_url, headers=self._headers, timeout=timeout
+                    ) as response:
+                        if response.status == 200:
+                            direct_result = await response.json()
+                            _LOGGER.debug("Direct health check response: %s", direct_result)
+                            return direct_result
+                except Exception as direct_error:
+                    _LOGGER.debug("Direct health check failed: %s", direct_error)
+                
+            # If all approaches fail, return empty dict
+            _LOGGER.warning("All health check approaches failed")
+            return {}
+            
         except Exception as e:
             _LOGGER.error("Health check error: %s", e)
             return {}

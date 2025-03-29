@@ -55,8 +55,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api_key = entry.data.get(CONF_API_KEY)
 
     session = async_get_clientsession(hass)
+    
+    # Special handling for Replit URLs
+    if '.replit.app' in host:
+        # For Replit deployments, use HTTPS and handle port properly
+        if not host.startswith('http'):
+            host = f"https://{host}"
+        base_url = host
+    else:
+        # For standard host:port combinations
+        base_url = f"http://{host}:{port}"
+
+    _LOGGER.debug("Creating API client with base URL: %s", base_url)
     api_client = EVChargingTrackerApiClient(
-        session, f"http://{host}:{port}", api_key
+        session, base_url, api_key
     )
 
     # Verify connection to API

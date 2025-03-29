@@ -29,14 +29,19 @@ async def validate_api_connection(
             if not host.startswith('https://'):
                 host = 'https://' + host
         
-        # When using a Replit domain, use port 8000 by default if not specified
-        if ':8000' not in host and ':443' not in host:
-            base_url = f"{host}:8000"
-        else:
+        # When using a Replit domain, determine if a port is already specified
+        if any(f":{port_num}" in host for port_num in ['443', '8000', '5000']):
+            # Port already in URL, leave it as is
             base_url = host
+            _LOGGER.debug("Using existing port in Replit URL: %s", base_url)
+        else:
+            # Add port 8000 by default
+            base_url = f"{host}:8000"
+            _LOGGER.debug("Adding port 8000 to Replit URL: %s", base_url)
     else:
         # For standard host:port combinations
         base_url = f"http://{host}:{port}"
+        _LOGGER.debug("Using standard URL format: %s", base_url)
     
     _LOGGER.debug("Creating API client with base URL: %s", base_url)
     
