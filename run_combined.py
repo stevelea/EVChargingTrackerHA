@@ -1,37 +1,27 @@
 """
 Combined runner for Streamlit app and API server.
-This script starts both the Streamlit app and the Flask API server in separate processes.
+This script starts the Streamlit app with integrated Flask API routes on the same port.
 """
 import os
-import subprocess
 import sys
 import threading
 import time
 
-def run_api_server():
-    """Run the API server in a separate process"""
-    print("Starting API server...")
-    # Set environment variables for the API server
-    api_env = os.environ.copy()
-    api_env['API_PORT'] = '8000'  # Use a different port for the API
+def run_streamlit_with_api():
+    """Run the Streamlit app with integrated API in the current process"""
+    print("Starting Streamlit app with integrated API...")
     
-    # Start the API server with the environment variables
-    api_process = subprocess.Popen([sys.executable, 'api.py'], env=api_env)
+    # First, start the Flask API server in a separate thread
+    # This is done *before* Streamlit to ensure the API routes are ready
+    import streamlit_api
     
-    # Wait for a few seconds to allow the API server to start
-    time.sleep(3)
+    # Start the Flask server in a background thread
+    streamlit_api.run_flask_with_streamlit(host='0.0.0.0', port=8505)
     
-    # Check if the process is still running
-    if api_process.poll() is None:
-        print("API server started successfully")
-    else:
-        print("Failed to start API server")
-        
-    return api_process
-
-def run_streamlit():
-    """Run the Streamlit app in the current process"""
-    print("Starting Streamlit app...")
+    # Wait a moment to ensure the Flask server is up
+    time.sleep(2)
+    
+    # Now start Streamlit
     import streamlit.web.cli as stcli
     
     # Set up the Streamlit command
@@ -49,12 +39,27 @@ def run_streamlit():
     
     # Run Streamlit
     sys.argv = args
+    
+    # Start the background refresh if available
+    if hasattr(streamlit_api, 'BACKGROUND_AVAILABLE') and streamlit_api.BACKGROUND_AVAILABLE:
+        import utils
+        import background
+        
+        try:
+            # Check if we have credentials with password
+            credentials = utils.load_credentials()
+            if credentials and 'email_address' in credentials and 'password' in credentials:
+                print("Found saved credentials, starting background refresh task")
+                background.start_background_refresh()
+                print("Background refresh task started")
+            else:
+                print("No saved password found, background refresh not started automatically")
+        except Exception as e:
+            print(f"Warning: Failed to start background refresh: {str(e)}")
+    
+    # This will block until Streamlit exits
     stcli.main()
 
 if __name__ == '__main__':
-    # Start the API server in a separate thread
-    api_thread = threading.Thread(target=run_api_server, daemon=True)
-    api_thread.start()
-    
-    # Run Streamlit in the main thread
-    run_streamlit()
+    # Start the combined app
+    run_streamlit_with_api()

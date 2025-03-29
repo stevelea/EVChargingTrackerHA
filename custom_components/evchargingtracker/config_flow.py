@@ -119,7 +119,7 @@ class EVChargingTrackerConfigFlow(config_entries.ConfigFlow, domain="evchargingt
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_HOST, default="localhost"): str,
-                vol.Required(CONF_PORT, default=8000): int,
+                vol.Required(CONF_PORT, default=8505): int,
                 vol.Optional(CONF_API_KEY, default="ev-charging-api-key"): str,
             }
         )
