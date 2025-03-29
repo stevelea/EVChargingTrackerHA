@@ -85,19 +85,60 @@ To modify the configuration:
 
 2. **Port Conflicts**: If port 5000 is already in use, change the port mapping in `docker-compose.yml`
 
-3. **Docker Build Network Issues**: If you encounter network errors when building the Docker image (such as "failed to do request" or "i/o timeout" errors), try these solutions:
+3. **Docker Build Network Issues**: If you encounter network errors when building the Docker image (such as "failed to do request" or "i/o timeout" errors), these are typically DNS resolution problems. Try these solutions in order:
 
-   - The Dockerfile now uses a specific digest for the Python image, which can help with connectivity issues
-   - DNS servers (Google's 8.8.8.8 and 8.8.4.4) have been added to docker-compose.yml 
-   - If issues persist, try:
-     ```bash
-     # Pull the base image manually first
-     docker pull python:3.11-slim@sha256:d71b8eea6c9fcc6b25230361faf142c84f23ad4fbd1f852c8de96316a40a1add
-     
-     # Then build with no cache
-     docker-compose build --no-cache
-     ```
-   - Check your Docker daemon network settings and ensure there are no firewall rules blocking Docker Hub
+   ### Solution A: Use the helper script (easiest)
+   ```bash
+   chmod +x docker-setup.sh
+   ./docker-setup.sh
+   ```
+   The script will:
+   - Try multiple ways to pull the image
+   - Modify the Dockerfile if needed
+   - Attempt builds with different options
+   - Start the container when successful
+   
+   ### Solution B: Fix Docker DNS settings (most reliable)
+   
+   Edit or create the Docker daemon configuration file:
+   ```bash
+   sudo nano /etc/docker/daemon.json
+   ```
+   
+   Add or modify the file to include Google DNS:
+   ```json
+   {
+     "dns": ["8.8.8.8", "8.8.4.4"]
+   }
+   ```
+   
+   Restart Docker:
+   ```bash
+   sudo systemctl restart docker
+   ```
+   
+   ### Solution C: Remove the specific digest
+   
+   Edit the Dockerfile and change:
+   ```
+   FROM python:3.11-slim@sha256:d71b8eea6c9fcc6b25230361faf142c84f23ad4fbd1f852c8de96316a40a1add
+   ```
+   to:
+   ```
+   FROM python:3.11-slim
+   ```
+   
+   ### Solution D: Build with network host option
+   ```bash
+   docker build --network=host -t ev-charging-tracker:latest .
+   docker run -d -p 5000:5000 -v "/portainer/Files/AppData:/app/data" --name ev-charging-tracker ev-charging-tracker:latest
+   ```
+   
+   ### Solution E: Check your networking
+   - Verify your internet connection is working
+   - Check if you're behind a corporate firewall or VPN
+   - Try a different network or disable firewall temporarily
+   - Ensure Docker can access external domains
 
 ## API Access
 

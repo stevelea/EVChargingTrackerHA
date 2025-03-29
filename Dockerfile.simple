@@ -1,0 +1,23 @@
+# Use the Python 3.11 slim image without a specific digest to improve compatibility
+FROM python:3.11-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Reduce Python buffering for better logging
+ENV PYTHONUNBUFFERED=1
+
+# Copy requirements file
+COPY docker-requirements.txt .
+
+# Install dependencies with specific configuration for better compatibility
+RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org -r docker-requirements.txt
+
+# Copy the application code
+COPY . .
+
+# Expose port 5000 for the application
+EXPOSE 5000
+
+# Run the application using the proxy that combines Streamlit and API
+CMD ["python", "run_proxy.py"]

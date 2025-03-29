@@ -2,7 +2,14 @@ version: '3'
 
 services:
   ev-charging-tracker:
-    build: .
+    build:
+      context: .
+      # If you're experiencing DNS issues, you can use these build args
+      args:
+        - PIP_INDEX_URL=https://pypi.org/simple/
+        - PIP_TRUSTED_HOST=pypi.org
+      # Uncomment the line below if you're having network issues during build
+      # network: host
     container_name: ev-charging-tracker
     ports:
       - "5000:5000"
@@ -10,10 +17,18 @@ services:
       # Mount the data directory to persist charging data
       - /portainer/Files/AppData:/app/data
     dns:
-      - 8.8.8.8
-      - 8.8.4.4
+      - 8.8.8.8  # Google DNS (primary)
+      - 8.8.4.4  # Google DNS (secondary)
+    environment:
+      - PYTHONUNBUFFERED=1  # Improve logging
     restart: unless-stopped
     
 networks:
   default:
     driver: bridge
+    # Uncomment the DNS configuration below if you're still having network issues
+    # config:
+    #   - subnet: 172.28.0.0/16
+    #   - gateway: 172.28.0.1
+    #   - ip_range: 172.28.5.0/24
+    #   - com.docker.network.bridge.name: docker_network_bridge

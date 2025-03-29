@@ -50,6 +50,10 @@ if 'charging_data' not in st.session_state:
     # We'll load data once the user is authenticated
     # This keeps data separate for each user
     
+    # Initialize guest mode
+    if 'guest_mode' not in st.session_state:
+        st.session_state.guest_mode = False
+    
     # Generate test data for development/testing
     if os.environ.get('ENABLE_TEST_DATA', 'false').lower() == 'true':
         # Create test data for the network map feature
